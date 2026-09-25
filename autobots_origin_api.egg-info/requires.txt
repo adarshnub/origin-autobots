@@ -1,0 +1,11 @@
+fastapi==0.115.6
+pydantic==2.13.3
+PyJWT[crypto]==2.10.1
+uvicorn==0.34.0
+
+[gcp]
+google-genai==2.25.0
+
+[test]
+httpx==0.28.1
+pytest==8.3.4

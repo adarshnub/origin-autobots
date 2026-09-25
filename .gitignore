@@ -1,0 +1,38 @@
+# Build output
+/.tools/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.pytest_cache/
+**/__pycache__/
+**/.venv/
+**/venv/
+coverage/
+.coverage
+/artifacts/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.example.tfvars
+.terraform/
+
+# Local user and test data
+*.db
+*.sqlite*
+artifacts/private/
+screenshots/
+audio/
+
+# IDE and operating system files
+.idea/
+.vs/
+.vscode/
+Thumbs.db
+Desktop.ini

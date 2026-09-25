@@ -1,0 +1,119 @@
+#!/bin/bash
+set -euo pipefail
+exec > >(tee -a /var/log/autobots-bootstrap.log | logger -t autobots-bootstrap -s 2>/dev/console) 2>&1
+
+dnf install -y python3.12 python3.12-pip unzip docker awscli-2
+systemctl enable --now docker
+id autobots >/dev/null 2>&1 || useradd --system --home-dir /opt/autobots --shell /sbin/nologin autobots
+install -d -o autobots -g autobots -m 0750 /opt/autobots/source /var/lib/autobots
+install -d -o root -g autobots -m 0750 /etc/autobots
+
+for attempt in $(seq 1 24); do
+  if aws s3 cp "s3://${artifact_bucket}/${api_artifact_key}" /tmp/autobots-api.zip --region "${aws_region}" --no-progress; then
+    break
+  fi
+  sleep 5
+done
+test -s /tmp/autobots-api.zip
+unzip -oq /tmp/autobots-api.zip -d /opt/autobots/source
+rm -f /tmp/autobots-api.zip
+python3.12 -m venv /opt/autobots/venv
+/opt/autobots/venv/bin/pip install --no-cache-dir "/opt/autobots/source[gcp]"
+chown -R autobots:autobots /opt/autobots
+
+aws s3 cp "s3://${artifact_bucket}/${gcp_credentials_key}" /etc/autobots/google-aws-wif.json --region "${aws_region}" --no-progress
+chown root:autobots /etc/autobots/google-aws-wif.json
+chmod 0640 /etc/autobots/google-aws-wif.json
+
+cat >/etc/autobots/autobots.env <<'AUTOBOTS_ENV'
+AWS_REGION=${aws_region}
+AWS_DEFAULT_REGION=${aws_region}
+GOOGLE_APPLICATION_CREDENTIALS=/etc/autobots/google-aws-wif.json
+GOOGLE_CLOUD_PROJECT=${gcp_project_id}
+GOOGLE_CLOUD_LOCATION=${gcp_model_location}
+COGNITO_USER_POOL_ID=${cognito_user_pool}
+COGNITO_APP_CLIENT_ID=${cognito_client_id}
+AUTOBOTS_MODEL_ID=gemini-3.5-flash-lite
+AUTOBOTS_LIVE_AI_ENABLED=true
+AUTOBOTS_DATABASE_PATH=/var/lib/autobots/autobots.db
+AUTOBOTS_MAX_MODEL_COST_USD_PER_TASK=0.25
+AUTOBOTS_MAX_MODEL_COST_USD_PER_DAY=0.50
+AUTOBOTS_MAX_MODEL_COST_USD_PER_MONTH=20.00
+AUTOBOTS_CAPTURE_RETENTION=none
+AUTOBOTS_INPUT_EXECUTION_ENABLED=false
+AUTOBOTS_ENV
+chown root:autobots /etc/autobots/autobots.env
+chmod 0640 /etc/autobots/autobots.env
+
+cat >/etc/systemd/system/autobots-api.service <<'API_SERVICE'
+[Unit]
+Description=Autobots by Origin Studios API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=autobots
+Group=autobots
+WorkingDirectory=/opt/autobots/source
+EnvironmentFile=/etc/autobots/autobots.env
+ExecStart=/opt/autobots/venv/bin/uvicorn services.api.app.main:app --host 127.0.0.1 --port 8765 --workers 1 --no-access-log
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/autobots
+
+[Install]
+WantedBy=multi-user.target
+API_SERVICE
+
+cat >/usr/local/sbin/autobots-db-backup <<'BACKUP_SCRIPT'
+#!/bin/bash
+set -euo pipefail
+source_db=/var/lib/autobots/autobots.db
+if [ ! -f "$source_db" ]; then exit 0; fi
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+backup_file="/var/tmp/autobots-$${stamp}.db"
+python3.12 - "$source_db" "$backup_file" <<'PY'
+import sqlite3, sys
+with sqlite3.connect(sys.argv[1]) as source, sqlite3.connect(sys.argv[2]) as target:
+    source.backup(target)
+PY
+aws s3 cp "$backup_file" "s3://${artifact_bucket}/backups/autobots-$${stamp}.db" --region "${aws_region}" --sse AES256 --no-progress
+rm -f "$backup_file"
+BACKUP_SCRIPT
+chmod 0750 /usr/local/sbin/autobots-db-backup
+
+cat >/etc/systemd/system/autobots-db-backup.service <<'BACKUP_SERVICE'
+[Unit]
+Description=Create an encrypted S3 backup of the Autobots task journal
+After=autobots-api.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/autobots-db-backup
+BACKUP_SERVICE
+
+cat >/etc/systemd/system/autobots-db-backup.timer <<'BACKUP_TIMER'
+[Unit]
+Description=Daily Autobots task journal backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+BACKUP_TIMER
+
+systemctl daemon-reload
+systemctl enable --now autobots-api.service autobots-db-backup.timer
+
+install -d -m 0750 /var/lib/caddy
+docker run --detach --name autobots-caddy --network host --restart unless-stopped \
+  --volume /var/lib/caddy:/data caddy:2.10.2 \
+  caddy reverse-proxy --from "${api_domain}" --to 127.0.0.1:8765

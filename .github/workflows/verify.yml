@@ -1,0 +1,48 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[test]"
+      - run: python -m pytest
+
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/website/package-lock.json
+      - run: npm ci
+        working-directory: apps/website
+      - run: npm run build
+        working-directory: apps/website
+
+  desktop:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet test apps/desktop/tests/Autobots.Core.Tests/Autobots.Core.Tests.csproj
+      - run: dotnet build apps/desktop/shell/Autobots.Desktop/Autobots.Desktop.csproj
+      - if: runner.os == 'Windows'
+        run: dotnet build platforms/windows/Autobots.Platform.Windows/Autobots.Platform.Windows.csproj

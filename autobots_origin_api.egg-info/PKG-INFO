@@ -1,0 +1,14 @@
+Metadata-Version: 2.2
+Name: autobots-origin-api
+Version: 0.1.0
+Summary: Autobots by Origin Studios API and local orchestration primitives
+Requires-Python: <3.13,>=3.11
+Requires-Dist: fastapi==0.115.6
+Requires-Dist: pydantic==2.13.3
+Requires-Dist: PyJWT[crypto]==2.10.1
+Requires-Dist: uvicorn==0.34.0
+Provides-Extra: test
+Requires-Dist: httpx==0.28.1; extra == "test"
+Requires-Dist: pytest==8.3.4; extra == "test"
+Provides-Extra: gcp
+Requires-Dist: google-genai==2.25.0; extra == "gcp"

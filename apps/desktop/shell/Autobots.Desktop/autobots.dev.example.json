@@ -1,0 +1,5 @@
+{
+  "apiBaseUrl": "https://replace-with-the-terraform-api-base-url",
+  "cognitoHostedUiBaseUrl": "https://replace-with-the-terraform-cognito-hosted-ui-base-url",
+  "cognitoClientId": "replace-with-the-terraform-cognito-app-client-id"
+}

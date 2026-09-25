@@ -1,0 +1,149 @@
+# Design configuration, not a turnkey deployment.
+# Validate against a schema implemented in M0. Never deploy placeholders.
+config_version: 1
+project:
+  slug: desktop-pilot
+  environment: dev
+  owner_email: null                     # Required before account provisioning.
+  signup_mode: invite_only
+  public_release_enabled: false
+
+cloud:
+  aws:
+    expected_account_id: null           # Required; preflight must verify it.
+    profile: null
+    region: ap-south-1
+    compute_profile: single_owner_ec2
+    initial_instance_type: t3.medium
+  gcp:
+    project_id: null                    # Required; never invent an existing ID.
+    model_location: global             # Not an India-only processing claim.
+    auth: workload_identity_federation
+    long_lived_service_account_key_allowed: false
+  api_domain: null
+  dashboard_domain: null
+
+models:
+  provider_mode: mock                   # Switch only after M0/M1 approval.
+  provider: google_cloud
+  sdk_version: PIN_AND_PROBE_DURING_M0
+  desktop_actor:
+    model_id: gemini-3.8-flash
+    environment: ENVIRONMENT_DESKTOP
+    thinking_level: LOW
+    enable_prompt_injection_detection: true
+  task_reasoner:
+    model_id: gemini-3.8-flash
+  recovery_planner:
+    enabled: false                     # Benchmark baseline before enabling.
+    model_id: gemini-3.1-pro-preview
+    use_builtin_computer_use: false
+  automatic_sdk_tool_execution: false
+  honor_provider_required_confirmations: true
+
+execution:
+  armed_by_default: false
+  authenticated_local_task_submission_may_arm: true
+  os: windows_11
+  architecture: x64
+  initial_monitor_count: 1
+  default_integrity: normal_user
+  require_interactive_unlocked_session: true
+  max_active_input_tasks: 1
+  physical_input_pauses_agent: true
+  resume_automatically_after_disconnect: false
+  initial_action_batch_size: 1
+  maximum_action_batch_size: 5
+  max_steps_per_task: 100
+  max_model_turns_per_task: 80
+  max_task_minutes: 20
+  max_ordinary_retries: 2
+  input_hotkey: Ctrl+Alt+Space
+  stop_hotkey: Ctrl+Alt+Shift+S
+  native_test_harness_enabled: false
+
+ui:
+  primary_running_control: STOP
+  show_current_app: true
+  show_cursor_halo: true
+  use_real_system_pointer: true
+  persistent_chat_panel: false
+  optional_compact_status: true
+  capture_own_overlay: false            # Requires platform validation/fallback.
+  label_adapter_actions_honestly: true
+
+adapters:
+  browser:
+    enabled: false                     # M4.
+    mode: extension_native_messaging
+    site_permissions: []
+    raw_debug_port_enabled: false
+    unrestricted_javascript_tool: false
+  vscode:
+    enabled: false                     # M4.
+    approved_workspaces: []             # Owner grants explicit paths.
+    remote_workspaces_allowed: false
+    unrestricted_command_dispatch: false
+  terminal:
+    enabled: false                     # Enable bounded test scope in M3.
+    owned_visible_session_preferred: true
+    unrestricted_shell_allowed: false
+    approved_executables: []
+    approved_workspaces: []
+
+permissions:
+  policy_version: 1
+  acquisition: explicit_approval
+  # Viewing ordinary web resources is browsing; saving/acquiring files is gated.
+  acquisition_includes:
+    - downloaded_files
+    - packages_and_dependencies
+    - installers
+    - browser_extensions
+    - vscode_extensions
+    - application_updates
+  outbound_communication: explicit_task_or_recipient_scoped_grant
+  destructive_changes: approval_required
+  elevated_operations: human_handoff
+  modify_agent_authorization: not_an_agent_tool
+  same_user_shell_is_sandbox: false
+  claim_injection_immunity: false
+
+voice:
+  enabled: false                       # M5.
+  mode: push_to_talk
+  command_source: selected_microphone
+  system_audio_is_command_source: false
+  provider: google_cloud_speech_to_text
+  model: SELECT_AND_TEST_DURING_M5
+  location: SELECT_AND_TEST_DURING_M5
+  initial_language: en-IN
+  additional_test_languages:
+    - ml-IN
+  transcript_confirmation: ambiguous_or_high_impact
+
+privacy:
+  persist_raw_screenshots: false
+  persist_command_audio: false
+  raw_debug_upload_requires_opt_in: true
+  diagnostic_artifact_max_retention_days: 1
+  metadata_log_retention_days: 14
+  meeting_recording_enabled: false
+  meeting_recording_requires_notice_and_permission: true
+
+budgets:
+  # Required before enabling live models. Null does NOT mean unlimited.
+  live_model_requests_allowed_when_limits_missing: false
+  max_model_cost_usd_per_task: null
+  max_model_cost_usd_per_day: null
+  max_model_cost_usd_per_month: null
+  reserve_inflight_request_budget: true
+
+release:
+  channel: private_alpha
+  require_signature_verification: true
+  require_approval_before_update_download: true
+  update_during_task: false
+
+# Invariants above are not remotely relaxable by model-generated instructions.
+# Broad arbitrary execution remains a weaker mode without OS/network isolation.

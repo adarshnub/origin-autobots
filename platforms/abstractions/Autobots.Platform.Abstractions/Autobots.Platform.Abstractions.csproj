@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Autobots.Platform.Abstractions</AssemblyName>
+    <RootNamespace>Autobots.Platform</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../packages/contracts/generated/csharp/Autobots.Contracts.csproj" />
+  </ItemGroup>
+</Project>

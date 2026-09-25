@@ -1,0 +1,69 @@
+config_version: 1
+product:
+  name: Autobots by Origin Studios
+  slug: autobots
+  public_signup_enabled: false
+  landing_page_enabled: false
+
+runtime:
+  mode: mock
+  initial_platform: windows
+  planned_platforms: [windows, macos, linux]
+  native_input_armed: false
+  require_interactive_unlocked_session: true
+  max_active_input_tasks: 1
+  resume_after_disconnect: false
+  action_batch_size: 1
+
+models:
+  provider: google_cloud
+  provider_mode: mock
+  live_calls_enabled: false
+  desktop_actor: gemini-3.5-flash-lite
+  routine_reasoner: gemini-3.5-flash-lite
+  recovery_model: gemini-3.8-flash
+  recovery_enabled: true
+  max_recovery_turns_per_task: 3
+  max_ordinary_retries: 2
+  automatic_sdk_tool_execution: false
+  honor_provider_confirmations: true
+
+budgets:
+  live_calls_when_limits_missing: false
+  max_model_cost_usd_per_task: 1.00
+  max_model_cost_usd_per_day: 5.00
+  max_model_cost_usd_per_month: 50.00
+  reserve_inflight_request_cost: true
+  effective_price_date: null
+
+cloud:
+  aws:
+    account_id: null
+    region: ap-south-1
+    profile: null
+  gcp:
+    project_id: null
+    billing_account_id: null
+    model_location: global
+    auth: workload_identity_federation
+    long_lived_service_account_key_allowed: false
+  api_domain: null
+  dashboard_domain: null
+
+privacy:
+  persist_raw_screenshots: false
+  persist_command_audio: false
+  raw_debug_upload_opt_in: true
+  meeting_recording_enabled: false
+  diagnostic_artifact_retention_hours: 24
+
+adapters:
+  browser_enabled: false
+  vscode_enabled: false
+  terminal_enabled: false
+  remote_workspaces_enabled: false
+
+release:
+  channel: private_alpha
+  signature_verification_required: true
+  update_requires_approval: true

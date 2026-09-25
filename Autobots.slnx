@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="apps/desktop/core/Autobots.Core/Autobots.Core.csproj" />
+  <Project Path="apps/desktop/shell/Autobots.Desktop/Autobots.Desktop.csproj" />
+  <Project Path="apps/desktop/tests/Autobots.Core.Tests/Autobots.Core.Tests.csproj" />
+  <Project Path="packages/contracts/generated/csharp/Autobots.Contracts.csproj" />
+  <Project Path="platforms/abstractions/Autobots.Platform.Abstractions/Autobots.Platform.Abstractions.csproj" />
+  <Project Path="platforms/windows/Autobots.Platform.Windows/Autobots.Platform.Windows.csproj" />
+</Solution>

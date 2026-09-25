@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://originstudios.example/autobots/action-envelope-v1.schema.json",
+  "title": "Autobots Action Envelope v1",
+  "description": "A model or adapter proposal that must be validated by the local supervisor before execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "device_id", "action_id", "observation_id", "lease_id", "epoch", "sequence", "action"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "task_id": { "type": "string", "format": "uuid" },
+    "device_id": { "type": "string", "format": "uuid" },
+    "action_id": { "type": "string", "format": "uuid" },
+    "observation_id": { "type": "string", "format": "uuid" },
+    "lease_id": { "type": "string", "format": "uuid" },
+    "epoch": { "type": "integer", "minimum": 0 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "x", "y", "button"],
+          "properties": {
+            "kind": { "const": "click" },
+            "x": { "type": "integer", "minimum": 0, "maximum": 999 },
+            "y": { "type": "integer", "minimum": 0, "maximum": 999 },
+            "button": { "enum": ["left", "middle", "right"] }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": { "const": "type_text" },
+            "text": { "type": "string", "minLength": 1, "maxLength": 4000 }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "key"],
+          "properties": {
+            "kind": { "const": "key_press" },
+            "key": { "type": "string", "minLength": 1, "maxLength": 32 }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "x", "y", "delta_x", "delta_y"],
+          "properties": {
+            "kind": { "const": "scroll" },
+            "x": { "type": "integer", "minimum": 0, "maximum": 999 },
+            "y": { "type": "integer", "minimum": 0, "maximum": 999 },
+            "delta_x": { "type": "integer", "minimum": -1200, "maximum": 1200 },
+            "delta_y": { "type": "integer", "minimum": -1200, "maximum": 1200 }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "duration_ms"],
+          "properties": {
+            "kind": { "const": "wait" },
+            "duration_ms": { "type": "integer", "minimum": 0, "maximum": 5000 }
+          }
+        }
+      ]
+    }
+  }
+}
