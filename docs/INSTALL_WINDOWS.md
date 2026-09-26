@@ -1,11 +1,11 @@
 # Install and use Autobots on Windows
 
-This self-contained Windows x64 development bundle connects to the owner-only Autobots API and private account sign-in configured for this deployment. AWS Cognito manages the Autobots account behind the sign-in page. Keep the ZIP private because its configuration identifies the private development service. The executable is unsigned.
+This self-contained Windows x64 pilot bundle connects to the invite-only Autobots API. AWS Cognito manages sign-in. The executable is unsigned. Downloading the ZIP does not grant account access; the owner must invite your email first.
 
 ## First run
 
 1. Extract the ZIP to a folder you control and run `Autobots.Desktop.exe`.
-2. Choose **Connect account** and sign in to your Autobots account in the browser. It is separate from Google or other app sign-ins. Complete the temporary-password change if this is your first sign-in.
+2. Choose **Connect account** and sign in to your Autobots account in the browser. It is separate from Google or other app sign-ins. Complete the temporary-password change if this is your first sign-in, then complete your username and purpose at the [pilot portal](https://autobots.origin-studio.in/pilot/index.html) before starting a task.
 3. Sign in to the websites and apps you want Autobots to use yourself (for browser tasks, the intended Google account in that browser).
 4. Type a task, or press the mic (or `Ctrl+Alt+Space` from any app) and say it. Choose **Start** (or `Ctrl+Enter`). Submitting authorizes screen capture and mouse/keyboard input for that task only.
 5. Autobots minimizes itself and a pilot bar appears at the bottom of the screen. Watch the glowing cursor move, click and type; the pilot bar shows each step and what the AI intends to do. A screenshot of the primary display is sent to the AI before each step; the API does not store screenshots.
@@ -17,7 +17,7 @@ Press `Ctrl+Alt+Space` (or the mic button, or **Talk to Autobots** in the tray) 
 
 ## Settings
 
-Open the gear in the header to change steps and minutes per task (defaults 40 and 10), pointer speed, the cursor halo, voice options and whether closing the window keeps Autobots in the tray. Keeping it in the tray keeps the talk and STOP shortcuts available; use **Quit Autobots** in the tray menu to exit.
+Open the gear in the header to change steps and minutes per task (defaults 100 and 10), pointer speed, the cursor halo, voice options and whether closing the window keeps Autobots in the tray. Keeping it in the tray keeps the talk and STOP shortcuts available; use **Quit Autobots** in the tray menu to exit.
 
 ## STOP and limits
 

@@ -39,10 +39,15 @@ class SQLiteBudgetLedger:
                     utc_month TEXT NOT NULL,
                     reserved_usd TEXT NOT NULL,
                     actual_usd TEXT,
-                    status TEXT NOT NULL CHECK(status IN ('pending', 'reconciled', 'released'))
+                    status TEXT NOT NULL CHECK(status IN ('pending', 'reconciled', 'released')),
+                    owner_sub TEXT
                 )
                 """
             )
+            columns = {row[1] for row in connection.execute(f"PRAGMA table_info({self.table})")}
+            if "owner_sub" not in columns:
+                connection.execute(f"ALTER TABLE {self.table} ADD COLUMN owner_sub TEXT")
+            connection.execute(f"CREATE INDEX IF NOT EXISTS ix_{self.table}_owner ON {self.table}(owner_sub)")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=5, isolation_level=None)
@@ -50,7 +55,8 @@ class SQLiteBudgetLedger:
         connection.execute("PRAGMA busy_timeout=5000")
         return connection
 
-    def reserve(self, task_id: UUID, estimate_usd: Decimal | int | float | str, now: datetime | None = None) -> UUID:
+    def reserve(self, task_id: UUID, estimate_usd: Decimal | int | float | str, now: datetime | None = None,
+                *, owner_sub: str | None = None, lifetime_limit_usd: Decimal | None = None) -> UUID:
         estimate = _money(estimate_usd)
         if estimate <= 0:
             raise ValueError("Reservation must be greater than zero")
@@ -64,6 +70,14 @@ class SQLiteBudgetLedger:
             task_total = _total(connection, self.table, "task_id = ?", (str(task_id),))
             day_total = _total(connection, self.table, "utc_day = ?", (utc_day,))
             month_total = _total(connection, self.table, "utc_month = ?", (utc_month,))
+            if lifetime_limit_usd is not None:
+                if not owner_sub:
+                    connection.rollback()
+                    raise ValueError("A pilot lifetime limit requires an owner subject")
+                lifetime_total = self._lifetime_total(connection, owner_sub)
+                if lifetime_total + estimate > lifetime_limit_usd:
+                    connection.rollback()
+                    raise BudgetExceeded("Pilot lifetime AI budget would be exceeded")
             if task_total + estimate > self.limits.per_task_usd:
                 connection.rollback()
                 raise BudgetExceeded("Per-task inference budget would be exceeded")
@@ -74,8 +88,8 @@ class SQLiteBudgetLedger:
                 connection.rollback()
                 raise BudgetExceeded("Monthly inference budget would be exceeded")
             connection.execute(
-                f"INSERT INTO {self.table}(reservation_id, task_id, created_at, utc_day, utc_month, reserved_usd, status) VALUES(?, ?, ?, ?, ?, ?, 'pending')",
-                (str(reservation_id), str(task_id), current.isoformat(), utc_day, utc_month, str(estimate)),
+                f"INSERT INTO {self.table}(reservation_id, task_id, created_at, utc_day, utc_month, reserved_usd, status, owner_sub) VALUES(?, ?, ?, ?, ?, ?, 'pending', ?)",
+                (str(reservation_id), str(task_id), current.isoformat(), utc_day, utc_month, str(estimate), owner_sub),
             )
             connection.commit()
         return reservation_id
@@ -106,6 +120,16 @@ class SQLiteBudgetLedger:
             )
             if cursor.rowcount != 1:
                 raise KeyError("Reservation is missing or already completed")
+
+    def lifetime_spend(self, owner_sub: str) -> Decimal:
+        with closing(self._connect()) as connection:
+            return self._lifetime_total(connection, owner_sub)
+
+    @staticmethod
+    def _lifetime_total(connection: sqlite3.Connection, owner_sub: str) -> Decimal:
+        existing = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        return sum((_total(connection, ledger, "owner_sub = ?", (owner_sub,))
+                    for ledger in _LEDGER_TABLES if ledger in existing), Decimal(0))
 
 
 def _total(connection: sqlite3.Connection, table: str, predicate: str, values: tuple[str, ...]) -> Decimal:

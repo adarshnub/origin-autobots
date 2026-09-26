@@ -10,6 +10,7 @@ def _configure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_REGION", "ap-south-1")
     monkeypatch.setenv("COGNITO_USER_POOL_ID", "ap-south-1_testpool")
     monkeypatch.setenv("COGNITO_APP_CLIENT_ID", "test-client")
+    monkeypatch.setenv("AUTOBOTS_OWNER_SUB", "owner-subject")
     monkeypatch.setattr(auth, "_jwk_client", lambda _url: SimpleNamespace(get_signing_key_from_jwt=lambda _token: SimpleNamespace(key="test-key")))
 
 
@@ -43,6 +44,18 @@ def test_non_owner_token_is_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
         "cognito:groups": [],
     })
 
+    with pytest.raises(HTTPException) as error:
+        auth.require_owner("Bearer valid-token")
+    assert error.value.status_code == 403
+
+
+def test_pilot_can_be_member_but_never_owner(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure(monkeypatch)
+    monkeypatch.setattr(auth.jwt, "decode", lambda *_args, **_kwargs: {
+        "sub": "pilot-subject", "client_id": "test-client", "token_use": "access",
+        "cognito:groups": [auth.PILOT_GROUP],
+    })
+    assert auth.require_member("Bearer valid-token").role == "pilot"
     with pytest.raises(HTTPException) as error:
         auth.require_owner("Bearer valid-token")
     assert error.value.status_code == 403

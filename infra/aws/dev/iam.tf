@@ -30,6 +30,19 @@ resource "aws_iam_role_policy" "api_usage" {
   })
 }
 
+resource "aws_iam_role_policy" "api_pilot_invites" {
+  name = "autobots-dev-pilot-invites"
+  role = aws_iam_role.api.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["cognito-idp:AdminCreateUser", "cognito-idp:AdminAddUserToGroup"]
+      Resource = aws_cognito_user_pool.owner.arn
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "ssm" {
   role       = aws_iam_role.api.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

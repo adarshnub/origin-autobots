@@ -7,8 +7,8 @@ resource "aws_cognito_user_pool" "owner" {
   admin_create_user_config {
     allow_admin_create_user_only = true
     invite_message_template {
-      email_subject = "Autobots by Origin Studios owner sign-in"
-      email_message = "Your owner account for Autobots is ready. Username: {username}. Temporary password: {####}. Sign in using the Autobots desktop app and choose a new password."
+      email_subject = "Your Autobots pilot invitation"
+      email_message = "You've been invited to the Autobots pilot by Origin Studios. Username: {username}. Temporary password: {####}. Sign in to the Windows app or pilot portal and choose a new password. Only invited accounts can use Autobots."
       sms_message   = "Autobots {username} sign-in code: {####}"
     }
   }
@@ -46,6 +46,13 @@ resource "aws_cognito_user_group" "owners" {
   precedence   = 1
 }
 
+resource "aws_cognito_user_group" "pilots" {
+  name         = "autobots-pilots"
+  user_pool_id = aws_cognito_user_pool.owner.id
+  description  = "Invited Autobots pilot users. API access also requires a local invite and completed profile."
+  precedence   = 10
+}
+
 resource "aws_cognito_user_pool_client" "desktop" {
   name         = "autobots-dev-desktop"
   user_pool_id = aws_cognito_user_pool.owner.id
@@ -56,8 +63,8 @@ resource "aws_cognito_user_pool_client" "desktop" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  callback_urls                        = ["http://127.0.0.1:53682/auth/callback"]
-  logout_urls                          = ["http://127.0.0.1:53682/auth/logout"]
+  callback_urls                        = ["http://127.0.0.1:53682/auth/callback", "https://autobots.origin-studio.in/pilot/index.html"]
+  logout_urls                          = ["http://127.0.0.1:53682/auth/logout", "https://autobots.origin-studio.in/pilot/index.html"]
   default_redirect_uri                 = "http://127.0.0.1:53682/auth/callback"
   supported_identity_providers         = ["COGNITO"]
   access_token_validity                = 15

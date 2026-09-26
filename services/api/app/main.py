@@ -11,10 +11,13 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.contracts.generated.python.action import ActionEnvelope
-from services.api.app.auth import OwnerPrincipal, require_owner
+from services.api.app.auth import OwnerPrincipal, require_member, require_owner
+from services.api.app.cognito_invites import InviteUnavailable, invite
+from services.api.app.pilots import PilotStore
 from services.api.app.budget import BudgetExceeded, BudgetLimits
 from services.api.app.google_provider import (
     GoogleCloudModelProvider,
@@ -28,19 +31,31 @@ from services.api.app.storage import IdempotencyConflict, SQLiteTaskStore, Store
 from services.api.app.usage import UsageStore, aws_billing
 
 
-API_VERSION = "0.4.2"
+API_VERSION = "0.5.0"
 # Advertised so the desktop client can detect an older deployed API and omit newer request fields.
-API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting", "calendar-field-observation")
+API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting", "calendar-field-observation", "invite-only-pilots")
 
 app = FastAPI(
     title="Autobots by Origin Studios API",
     version=API_VERSION,
-    description="Owner-only control plane. The local supervisor remains authoritative for all desktop input.",
+    description="Invite-only control plane. The local supervisor remains authoritative for all desktop input.",
 )
+app.add_middleware(CORSMiddleware, allow_origins=["https://autobots.origin-studio.in"],
+                   allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"],
+                   allow_credentials=False)
 logger = logging.getLogger(__name__)
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class PilotInviteRequest(StrictModel):
+    email: str = Field(min_length=5, max_length=254, pattern=r"^[^\s@,]+@[^\s@,]+\.[^\s@,]+$")
+
+
+class PilotProfileRequest(StrictModel):
+    username: str = Field(min_length=2, max_length=60)
+    purpose: str = Field(min_length=10, max_length=500)
 
 
 class DeviceEnrollmentRequest(StrictModel):
@@ -148,11 +163,76 @@ def _speech_budget_limits() -> BudgetLimits:
 store = SQLiteTaskStore()
 budget_ledger = SQLiteBudgetLedger(store.path, _budget_limits())
 speech_ledger = SQLiteBudgetLedger(store.path, _speech_budget_limits(), table="speech_reservations")
+pilots = PilotStore(store.path)
 _SPEECH_RESERVATION_USD = Decimal("0.002")
+_PILOT_LIFETIME_USD = Decimal("10.00")
 
 
 def _current_owner(authorization: Annotated[str | None, Header()] = None) -> OwnerPrincipal:
+    principal = require_member(authorization)
+    if principal.role == "pilot":
+        profile = pilots.get(principal.subject)
+        if not profile or not profile["enabled"]:
+            raise HTTPException(status_code=403, detail={"code": "pilot_not_invited"})
+        if not profile["onboarded_at"]:
+            raise HTTPException(status_code=403, detail={"code": "pilot_profile_required"})
+    return principal
+
+
+def _current_member(authorization: Annotated[str | None, Header()] = None) -> OwnerPrincipal:
+    return require_member(authorization)
+
+
+def _current_admin(authorization: Annotated[str | None, Header()] = None) -> OwnerPrincipal:
     return require_owner(authorization)
+
+
+@app.get("/v1/pilot/me", tags=["pilot"])
+async def pilot_me(principal: Annotated[OwnerPrincipal, Depends(_current_member)]) -> dict:
+    if principal.role == "owner":
+        return {"role": "owner", "subject": principal.subject}
+    profile = pilots.get(principal.subject)
+    if not profile or not profile["enabled"]:
+        raise HTTPException(status_code=403, detail={"code": "pilot_not_invited"})
+    return {"role": "pilot", "profile": profile,
+            "lifetime_limit_usd": str(_PILOT_LIFETIME_USD),
+            "lifetime_used_usd": str(budget_ledger.lifetime_spend(principal.subject))}
+
+
+@app.post("/v1/pilot/profile", tags=["pilot"])
+async def pilot_profile(request: PilotProfileRequest,
+                        principal: Annotated[OwnerPrincipal, Depends(_current_member)]) -> dict:
+    if len(request.username.strip()) < 2 or len(request.purpose.strip()) < 10:
+        raise HTTPException(status_code=422, detail={"code": "pilot_profile_invalid"})
+    if principal.role != "pilot" or not pilots.onboard(principal.subject, request.username, request.purpose):
+        raise HTTPException(status_code=403, detail={"code": "pilot_profile_unavailable"})
+    return {"status": "complete"}
+
+
+@app.get("/v1/admin/pilots", tags=["admin"])
+async def admin_pilots(principal: Annotated[OwnerPrincipal, Depends(_current_admin)]) -> dict:
+    return {"pilots": [{**profile, "lifetime_limit_usd": str(_PILOT_LIFETIME_USD),
+                        "lifetime_used_usd": str(budget_ledger.lifetime_spend(profile["subject"]))}
+                       for profile in pilots.list()]}
+
+
+@app.post("/v1/admin/pilots", tags=["admin"], status_code=201)
+async def admin_invite_pilot(request: PilotInviteRequest,
+                             principal: Annotated[OwnerPrincipal, Depends(_current_admin)]) -> dict:
+    email = request.email.strip().lower()
+    if email == os.getenv("AUTOBOTS_OWNER_EMAIL", "").lower():
+        raise HTTPException(status_code=409, detail={"code": "owner_cannot_be_invited"})
+    if any(profile["email"] == email for profile in pilots.list()):
+        raise HTTPException(status_code=409, detail={"code": "pilot_already_invited"})
+    try:
+        subject = await invite(email)
+        pilots.add(subject, email)
+    except InviteUnavailable as error:
+        raise HTTPException(status_code=503, detail={"code": "invitation_unavailable"}) from error
+    except Exception as error:
+        logger.error("pilot_registration_failed class=%s", type(error).__name__)
+        raise HTTPException(status_code=503, detail={"code": "invitation_record_unavailable"}) from error
+    return {"email": email, "status": "invited"}
 
 
 @lru_cache(maxsize=1)
@@ -270,7 +350,10 @@ async def propose_action(
 
     reservation = None
     try:
-        reservation = budget_ledger.reserve(task_id, Decimal("0.01"))
+        reservation = budget_ledger.reserve(
+            task_id, Decimal("0.05") if principal.role == "pilot" else Decimal("0.01"),
+            owner_sub=principal.subject,
+            lifetime_limit_usd=_PILOT_LIFETIME_USD if principal.role == "pilot" else None)
     except BudgetExceeded as error:
         raise HTTPException(status_code=429, detail={"code": "model_budget_exhausted"}) from error
 
@@ -403,7 +486,9 @@ async def transcribe_voice_instruction(
         raise HTTPException(status_code=422, detail={"code": "invalid_audio", "reason": str(error)}) from error
 
     try:
-        reservation = speech_ledger.reserve(uuid4(), _SPEECH_RESERVATION_USD)
+        reservation = speech_ledger.reserve(
+            uuid4(), _SPEECH_RESERVATION_USD, owner_sub=principal.subject,
+            lifetime_limit_usd=_PILOT_LIFETIME_USD if principal.role == "pilot" else None)
     except BudgetExceeded as error:
         raise HTTPException(status_code=429, detail={"code": "speech_budget_exhausted"}) from error
     usage = UsageStore(store.path)

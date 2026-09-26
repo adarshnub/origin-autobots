@@ -60,15 +60,15 @@ class UsageStore:
                 item["estimated_usd"] = str(item["estimated_usd"])
             channels = []
             for operation, ledger in (("desktop", inference), ("speech", speech)):
-                # The pilot is owner-only. Inference rows are additionally joined to owned tasks;
-                # speech had no owner field historically, so legacy speech totals are explicitly app-wide.
+                # Legacy speech rows predate owner attribution. They are excluded from
+                # per-user usage and remain in the global budget ledger.
                 if operation == "desktop":
                     records = db.execute("""SELECT r.utc_day,r.reserved_usd,r.actual_usd,r.status
                         FROM inference_reservations r JOIN tasks t ON t.task_id=r.task_id
                         WHERE t.owner_sub=? AND r.utc_month=?""", (owner, month)).fetchall()
                 else:
                     records = db.execute("""SELECT utc_day,reserved_usd,actual_usd,status
-                        FROM speech_reservations WHERE utc_month=?""", (month,)).fetchall()
+                        FROM speech_reservations WHERE utc_month=? AND owner_sub=?""", (month, owner)).fetchall()
                 relevant = [r for r in records if r[3] != "released"]
                 def amount(r):
                     return Decimal(r[1] if r[3] == "pending" else r[2] or "0")
@@ -81,7 +81,7 @@ class UsageStore:
         return dict(as_of=now.isoformat(), utc_day=day, utc_month=month, currency="USD",
             token_tracking_since=first, channels=channels, models=list(models.values()),
             note="Budget accounted includes pending reservations and conservative charges for failed requests. "
-                 "Token details cover requests since detailed tracking began. Speech budget totals are app-wide for this closed owner pilot. "
+                 "Token details cover requests since detailed tracking began. Older speech rows without user attribution remain in global limits. "
                  "Request costs are estimates, not cloud invoices; do not add them to GCP billing totals.")
 
 

@@ -10,12 +10,14 @@ from jwt import PyJWKClient
 
 
 OWNER_GROUP = "autobots-owners"
+PILOT_GROUP = "autobots-pilots"
 
 
 @dataclass(frozen=True)
 class OwnerPrincipal:
     subject: str
     username: str
+    role: str = "owner"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,13 @@ def _jwk_client(url: str) -> PyJWKClient:
 
 
 def require_owner(authorization: str | None) -> OwnerPrincipal:
+    principal = require_member(authorization)
+    if principal.role != "owner" or not os.getenv("AUTOBOTS_OWNER_SUB") or principal.subject != os.getenv("AUTOBOTS_OWNER_SUB"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access is required.")
+    return principal
+
+
+def require_member(authorization: str | None) -> OwnerPrincipal:
     settings = configured_cognito()
     if settings is None:
         raise HTTPException(
@@ -79,7 +88,11 @@ def require_owner(authorization: str | None) -> OwnerPrincipal:
     groups = claims.get("cognito:groups") or []
     if claims.get("token_use") != "access" or claims.get("client_id") != settings.app_client_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The Cognito access token is for another client.")
-    if settings.owner_group not in groups:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is not enrolled as the Autobots owner.")
+    if settings.owner_group in groups and claims["sub"] == os.getenv("AUTOBOTS_OWNER_SUB"):
+        role = "owner"
+    elif PILOT_GROUP in groups:
+        role = "pilot"
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is not enrolled in the Autobots pilot.")
 
-    return OwnerPrincipal(subject=str(claims["sub"]), username=str(claims.get("username", "")))
+    return OwnerPrincipal(subject=str(claims["sub"]), username=str(claims.get("username", "")), role=role)

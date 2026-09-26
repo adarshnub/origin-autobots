@@ -13,6 +13,7 @@ $instanceId = $outputs.api_instance_id.value
 $region = $outputs.aws_region.value
 $bucket = $outputs.artifact_bucket_name.value
 $apiUrl = $outputs.api_base_url.value
+$poolId = $outputs.cognito_user_pool_id.value
 if ([string]::IsNullOrWhiteSpace($instanceId) -or [string]::IsNullOrWhiteSpace($region) -or [string]::IsNullOrWhiteSpace($bucket) -or [string]::IsNullOrWhiteSpace($apiUrl)) {
     throw "AWS Terraform outputs are incomplete."
 }
@@ -21,6 +22,14 @@ $activeAccount = & aws sts get-caller-identity --query Account --output text
 if ($LASTEXITCODE -ne 0 -or $activeAccount -ne $expectedAccount) {
     throw "The active AWS identity does not match the deployed Autobots account."
 }
+$ownerVars = Get-Content -LiteralPath (Join-Path $awsDir "dev.auto.tfvars")
+$ownerMatch = $ownerVars | Select-String -Pattern '^owner_email\s*=\s*"([^" ]+)"$'
+if (-not $ownerMatch) { throw "The configured owner email is unavailable." }
+$ownerEmail = $ownerMatch.Matches[0].Groups[1].Value
+$ownerJson = & aws cognito-idp admin-get-user --user-pool-id $poolId --username $ownerEmail --region $region --output json
+if ($LASTEXITCODE -ne 0) { throw "The enrolled Cognito owner could not be read." }
+$ownerSub = (($ownerJson | ConvertFrom-Json).UserAttributes | Where-Object { $_.Name -eq "sub" } | Select-Object -First 1).Value
+if ($ownerSub -notmatch '^[0-9a-fA-F-]{36}$') { throw "The owner Cognito subject is invalid." }
 
 $remoteCommand = @'
 set -euo pipefail
@@ -42,6 +51,8 @@ cat >/etc/systemd/system/autobots-api.service.d/usage.conf <<'USAGE_CONFIG'
 [Service]
 Environment=AUTOBOTS_AWS_ACCOUNT_ID=@@ACCOUNT@@
 Environment=AUTOBOTS_AWS_BUDGET_NAME=autobots-dev-monthly-account-alert
+Environment=AUTOBOTS_OWNER_SUB=@@OWNER_SUB@@
+Environment=AUTOBOTS_OWNER_EMAIL=@@OWNER_EMAIL@@
 USAGE_CONFIG
 systemctl daemon-reload
 if systemctl start autobots-api; then
@@ -64,7 +75,7 @@ for attempt in $(seq 1 20); do
 done
 exit 1
 '@
-$remoteCommand = $remoteCommand.Replace("@@BUCKET@@", $bucket).Replace("@@REGION@@", $region).Replace("@@ACCOUNT@@", $expectedAccount)
+$remoteCommand = $remoteCommand.Replace("@@BUCKET@@", $bucket).Replace("@@REGION@@", $region).Replace("@@ACCOUNT@@", $expectedAccount).Replace("@@OWNER_SUB@@", $ownerSub).Replace("@@OWNER_EMAIL@@", $ownerEmail)
 
 $request = @{
     DocumentName = "AWS-RunShellScript"

@@ -4,7 +4,7 @@
 **Initial platform:** Windows 11 x64, one monitor, interactive standard-user session.  
 **Future platforms:** macOS and Linux, using shared contracts/core with OS-specific adapters.  
 **Cloud:** AWS control plane and Google Cloud managed Gemini inference.  
-**Initial access:** owner only; closed registration.
+**Initial access:** invite-only owner and selected pilots; public self-registration disabled.
 
 The original plan remains in `archive/MASTER_PLAN.initial.md`. This specification supersedes its WPF-only shell, Windows-only project shape, product name and model defaults. Other security, privacy, release and milestone boundaries continue to apply unless revised here.
 
@@ -18,7 +18,7 @@ The first product slice is a typed or spoken instruction and an authenticated sc
 
 - Display name: **Autobots by Origin Studios**.
 - Keep internal namespaces consistent with `Autobots` / `autobots`.
-- The landing-page application is a separate public website project. Its product showcase, illustrated walkthrough, developer profile and platform roadmap were commissioned after the initial blank placeholder. It has no public signup or analytics. The owner-only, unsigned Windows pilot is not a public download.
+- The landing-page application is a separate public website project. Its product showcase, illustrated walkthrough, developer profile and platform roadmap were commissioned after the initial blank placeholder. It has no public signup or analytics. The unsigned Windows pilot may be downloaded publicly, while account access remains invitation-only.
 - Keep the original handoff intact under `docs/archive/`.
 - The public product identity uses the paired-eyes mark across website and desktop icon resources. Companion art and WebGL helper robots are decorative; they do not signal task authorization. The website's voice-to-Calendar-to-WhatsApp walkthrough is explicitly simulated and never accesses user accounts, microphone or desktop input. The developer profile's current role is AI Engineer at Ant Venture.ai; the owner-selected portfolio exclusions apply to public content.
 
@@ -75,6 +75,8 @@ Google Cloud is the first provider behind a replaceable `ModelProvider` interfac
 ### Budget controls
 
 The deployed pilot ledger limits inference to **$1 per task, $5 per UTC day and $100 per UTC calendar month**. Voice transcription uses a separate ledger with defaults of **$0.01 per request, $0.10 per UTC day and $2 per UTC month**. These are API-side request controls, not Google Cloud billing guarantees. Reserve estimated request cost before dispatch, reconcile provider-reported usage, account for in-flight requests after crashes, and block a call that would exceed a limit. Do not let the model or remote dashboard silently raise a limit.
+
+Invited pilot users have an additional **$10 lifetime AI request limit per Cognito subject**, shared across desktop inference and speech reservations. The owner account `adarshmanjady@gmail.com` is exempt from this per-user lifetime cap; global service limits still apply. Account enrollment requires the `autobots-pilots` group, a matching enabled local invite record, and a completed username/purpose profile. Cognito administers one-time password invitations and the first password change. Only the configured owner subject in `autobots-owners` may invite and view the owner dashboard. Provider costs remain estimates; a single request can reconcile above its reservation, so the cap is a dispatch guard rather than a billing guarantee.
 
 Record provider, model, service tier, input/output/cache usage, estimated cost, route reason, latency, retry count and validation result. Keep hosting, speech, storage and egress accounting separate. Pricing changes over time; store rates with effective dates and refresh them before enabling live traffic.
 

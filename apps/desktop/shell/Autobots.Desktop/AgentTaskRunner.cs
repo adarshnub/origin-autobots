@@ -147,6 +147,7 @@ public sealed class AgentTaskRunner(
             var requiresFreshCalendarEvent = instruction.StartsWith("Fresh Google Calendar scheduling test.", StringComparison.OrdinalIgnoreCase);
             var freshCalendarHomeSeen = false;
             var initialCalendarRepairAttempted = false;
+            var exactNotepadText = ExactNotepadText.FromOwnerInstruction(instruction);
 
             async Task<(int Actions, string? Error)> RepairCalendarFieldsAsync(long firstSequence, nint expectedWindow)
             {
@@ -356,6 +357,8 @@ public sealed class AgentTaskRunner(
                         continue;
                     }
                     var completed = result.Status == "completed";
+                    if (completed && WhatsAppCompletionGuard.RequiresReview(instruction))
+                        return Finish(AgentOutcome.Uncertain, WhatsAppCompletionGuard.ReviewMessage);
                     return Finish(
                         completed ? AgentOutcome.Completed : AgentOutcome.NeedsInput,
                         result.CompletionMessage ?? (completed ? "The task looks complete. Check the result on screen." : "Autobots needs more detail to continue."));
@@ -364,6 +367,14 @@ public sealed class AgentTaskRunner(
                     throw new InvalidOperationException("The service returned an unsupported task step.");
 
                 var action = result.Proposal.Action;
+                if (exactNotepadText is not null && ExactNotepadText.IsNotepad(frame.ForegroundProcessName) &&
+                    action is TypeTextAction proposedText && !string.Equals(proposedText.Text, exactNotepadText, StringComparison.Ordinal))
+                {
+                    runLog.Write("rejected", new { sequence, stage = "exact-notepad-text", proposedLength = proposedText.Text.Length,
+                        requiredLength = exactNotepadText.Length });
+                    return Finish(AgentOutcome.NeedsInput,
+                        "The proposed Notepad text differed from the exact story in your task. Autobots stopped before typing or sharing it.");
+                }
                 if (!calendarFieldLoop.CanExecute(action, frame.ForegroundWindowTitle, result.Intent))
                 {
                     if (frame.CalendarFields is not null && CalendarTaskTiming.FromOwnerInstruction(instruction) is not null)
@@ -529,7 +540,7 @@ public sealed class AgentTaskRunner(
         AgentOutcome.StepLimit => "Step limit reached",
         AgentOutcome.TimeLimit => "Time limit reached",
         AgentOutcome.Handoff => "Your turn",
-        AgentOutcome.Uncertain => "Stopped mid-action",
+        AgentOutcome.Uncertain => "Result needs review",
         _ => "Task stopped"
     };
 

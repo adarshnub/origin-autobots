@@ -211,6 +211,9 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
             case TypeTextAction typeText:
                 EnsureKeyboardTargetIsControllable(dispatch);
                 EnsureFocusedControlAcceptsText();
+                // Modern Notepad can acknowledge a large SendInput batch while dropping most of
+                // its Unicode characters. A blank document gives us an exact, read-only check.
+                var verifyBlankNotepad = TryReadFocusedNotepadText() is { Length: 0 };
                 pointerOverlay?.SetActivity(PointerActivity.Typing);
                 TypeText(typeText.Text, dispatch);
                 if (typeText.PressEnter)
@@ -219,6 +222,8 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
                     dispatch.Check(force: true);
                     SendBatchAndTrack(KeyStroke(0x0D, dispatch.KeyboardLayout), dispatch);
                 }
+                if (verifyBlankNotepad && !typeText.PressEnter)
+                    VerifyNotepadText(typeText.Text, dispatch);
                 break;
             case KeyPressAction keyPress:
             {
@@ -298,31 +303,59 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
     private void TypeText(string text, ActionDispatch dispatch)
     {
         var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-        // Short text is typed at a visible pace; long text is sent in quick bursts.
-        var paced = normalized.Length <= 80;
-        var perBatch = paced ? 1 : 24;
-        var batch = new List<Input>(perBatch * 2);
-        for (var index = 0; index < normalized.Length;)
+        // Send one character per batch. Bursting 24 characters at once was observed to leave a
+        // 122-character Notepad document containing mostly spaces and periods after a 168-char
+        // proposal. A small gap lets the editor consume each WM_CHAR before the next batch.
+        for (var index = 0; index < normalized.Length; index++)
         {
             dispatch.Check();
-            batch.Clear();
-            for (var count = 0; count < perBatch && index < normalized.Length; count++, index++)
+            var character = normalized[index];
+            if (character == '\n')
+                SendBatchAndTrack(KeyStroke(0x0D, dispatch.KeyboardLayout), dispatch);
+            else if (character == '\t')
+                SendBatchAndTrack(KeyStroke(0x09, dispatch.KeyboardLayout), dispatch);
+            else if (!char.IsControl(character))
             {
-                var character = normalized[index];
-                if (character == '\n')
-                    batch.AddRange(KeyStroke(0x0D, dispatch.KeyboardLayout));
-                else if (character == '\t')
-                    batch.AddRange(KeyStroke(0x09, dispatch.KeyboardLayout));
-                else if (!char.IsControl(character))
-                {
-                    batch.Add(UnicodeKey(character, keyUp: false));
-                    batch.Add(UnicodeKey(character, keyUp: true));
-                }
+                SendBatchAndTrack([UnicodeKey(character, keyUp: false), UnicodeKey(character, keyUp: true)], dispatch);
             }
-            if (batch.Count > 0)
-                SendBatchAndTrack(batch.ToArray(), dispatch);
-            Thread.Sleep(paced ? 16 : 8);
+            Thread.Sleep(25);
         }
+    }
+
+    private static string? TryReadFocusedNotepadText()
+    {
+        try
+        {
+            var focused = AutomationElement.FocusedElement;
+            if (focused is null || focused.Current.ProcessId <= 0 ||
+                !Process.GetProcessById(focused.Current.ProcessId).ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase))
+                return null;
+            var window = AutomationElement.RootElement.FindFirst(TreeScope.Children,
+                new PropertyCondition(AutomationElement.ProcessIdProperty, focused.Current.ProcessId));
+            var document = window?.FindFirst(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document));
+            if (document is null || !document.TryGetCurrentPattern(TextPattern.Pattern, out var pattern) || pattern is not TextPattern textPattern)
+                return null;
+            return textPattern.DocumentRange.GetText(-1).Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
+        }
+        catch (ElementNotAvailableException) { return null; }
+        catch (InvalidOperationException) { return null; }
+        catch (ArgumentException) { return null; }
+    }
+
+    private static void VerifyNotepadText(string expected, ActionDispatch dispatch)
+    {
+        var normalized = expected.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd('\n');
+        string? observed = null;
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            dispatch.Check(force: true);
+            observed = TryReadFocusedNotepadText();
+            if (observed == normalized)
+                return;
+            Thread.Sleep(80);
+        }
+        throw new ActionInterruptedException($"Notepad retained {observed?.Length ?? 0} of {normalized.Length} expected characters after typing. Autobots stopped before copying or sharing uncertain text.");
     }
 
     private Input[] ChordInputs(KeyChord chord, nint layout)
