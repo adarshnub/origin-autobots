@@ -1,5 +1,6 @@
 param(
-    [string]$ReleaseName = "Autobots-Windows"
+    [string]$ReleaseName = "Autobots-Windows",
+    [switch]$NoRestore
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +28,9 @@ New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
 $bundleDir = Join-Path $artifactRoot ("{0}-{1}" -f $ReleaseName, (Get-Date -Format "yyyyMMdd-HHmmss"))
 New-Item -ItemType Directory -Path $bundleDir | Out-Null
 
-& $dotnet publish $project --configuration Release --runtime win-x64 --self-contained true `
+[string[]]$restoreArguments = @()
+if ($NoRestore) { $restoreArguments += "--no-restore" }
+& $dotnet publish $project --configuration Release --runtime win-x64 --self-contained true @restoreArguments `
     -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true `
     --output $bundleDir
 if ($LASTEXITCODE -ne 0) { throw "The Windows desktop publish failed." }

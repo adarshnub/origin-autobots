@@ -429,11 +429,16 @@ public sealed class WindowsPointerOverlay : IAgentPointerOverlay
         using (var border = new Pen(Color.FromArgb(150, Accent), (float)(1 * scale)))
             graphics.DrawPath(border, path);
 
-        var dotRadius = (float)((activity is PointerActivity.Thinking or PointerActivity.Waiting ? 3 + pulse : 3.5) * scale);
         var dotX = x + (float)(14 * scale);
         var dotY = y + (height / 2);
         using (var dot = new SolidBrush(activity == PointerActivity.Clicking ? Ripple : Accent))
-            graphics.FillEllipse(dot, dotX - dotRadius, dotY - dotRadius, dotRadius * 2, dotRadius * 2);
+        {
+            // A small pair of eyes keeps the cursor caption in the same visual family as the pilot.
+            var eyeWidth = (float)(3.4 * scale);
+            var eyeHeight = (float)((activity is PointerActivity.Thinking or PointerActivity.Waiting ? 6 + pulse : 7) * scale);
+            graphics.FillEllipse(dot, dotX - (float)(5 * scale), dotY - eyeHeight / 2, eyeWidth, eyeHeight);
+            graphics.FillEllipse(dot, dotX + (float)(1 * scale), dotY - eyeHeight / 2 + (float)scale, eyeWidth, eyeHeight - (float)scale);
+        }
 
         var textX = x + (float)(24 * scale);
         var textWidth = width - (float)(32 * scale);

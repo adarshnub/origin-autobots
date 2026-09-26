@@ -1,5 +1,9 @@
 # Capability and toolchain findings
 
+## Eyes brand and illustrated voice workflow — 26 September 2026
+
+The website now uses the eyes brand mark consistently with native Windows icon resources, and the desktop empty activity view has a shaded helper illustration. The existing WebGL helpers have distinct curved scroll paths, later formations and manual Orbit/V controls. The landing walkthrough is a locally rendered simulation of voice instruction, Google Calendar creation and WhatsApp sharing to the owner-specified contact; no real app workflow is claimed verified. The developer page now lists the role AI Engineer, 16 curated public projects and 10 resume-based professional contributions. Requested exclusions and employer project details are omitted. See [brand and walkthrough notes](website-brand-and-walkthrough.md) and [portfolio sources](developer-project-sources.md). No app/browser tests were run.
+
 ## Developer portfolio expansion — 26 September 2026
 
 The developer page now identifies Ant Venture.ai as the current company using the owner's correction, and links GitHub account `adarshnub`. Public GitHub documentation and selected source files provided the basis for 22 project summaries, categorized filtering, text search, and three featured projects. The existing React/Vite dependencies were sufficient; no installation or framework migration was needed. See [portfolio source notes](developer-project-sources.md). Only the production build and AWS publication workflow were run; application and browser testing remain skipped at the owner's request.

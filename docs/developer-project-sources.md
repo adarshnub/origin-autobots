@@ -1,5 +1,15 @@
 # Developer portfolio sources
 
+## Current curation update — 26 September 2026
+
+The owner requested a narrower public portfolio and supplied a local resume. The website now presents 16 public GitHub projects, plus 10 professional contribution summaries drawn from `adarsh_v__resume_pdf.pdf` in the owner's Downloads folder. Resume contributions have no repository links. The title is **AI Engineer**, currently at **Ant Venture.ai** (May 2026–present). Earlier TGH Technologies roles are labeled as past experience.
+
+Removed from the rendered gallery: the Ant Venture brand website, Datacom, Git City, Pe-Do, Petgram, and the earlier personal portfolio. Rahma, related planning repositories, private repositories and other Ant Venture project details are excluded. Resume sections about Orbita, Rahma and the bill-validation project under the current employer were omitted to respect that exclusion. The current employer remains named solely as the requested role/background information.
+
+Resume-based work includes Infinite Nexus, a web video editor, Infinite Product Swap, long-form AI video generation, Infinite Studios Marketplace, Teledesk, The Job Applicant Perspective, Fintalent, Omnipacs and Meeval. Descriptions use contribution wording where appropriate. Unverified performance comparisons, usage counts, patent status, phone number and personal email were not published. The resume itself was read locally and is not included in the website bundle.
+
+The source list below records the earlier research history; it does not define the current public project selection.
+
 Updated 26 September 2026. The portfolio uses public information from [adarshnub on GitHub](https://github.com/adarshnub), public repository documentation, and selected source files. The owner supplied the current company name **Ant Venture.ai**, which supersedes the older LinkedIn employer reference. The existing education details came from the owner-supplied [LinkedIn profile](https://www.linkedin.com/in/adarsh-viswam-95161016b/).
 
 The public GitHub profile and repository metadata were read using GitHub and its unauthenticated REST API. README content was read through the README API or raw.githubusercontent.com. No repositories were cloned or executed; no dependencies were installed. Repository capabilities below describe published source and documentation, not independently tested behavior or operational status.

@@ -339,7 +339,7 @@ public sealed class PilotHudWindow : Window
         _orbGlow.Fill = accent;
         _orbArc.Stroke = accent;
         _orbArc.IsVisible = spinning;
-        _orbIcon.Content = Ui.Icon(icon, 18, tone == HudTone.Active ? Ui.AccentBrush : accent);
+        _orbIcon.Content = tone == HudTone.Active ? Ui.BrandMark(32) : Ui.Icon(icon, 18, accent);
         _card.BorderBrush = tone switch
         {
             HudTone.Listening => Ui.Solid("#66F0525C"),

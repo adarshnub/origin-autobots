@@ -3,12 +3,30 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 
 namespace Autobots.Desktop;
 
 /// <summary>Autobots' dark, Mica-friendly palette and control skins layered over the Fluent theme.</summary>
 public static class Ui
 {
+    private static readonly Lazy<Bitmap?> EyesBitmap = new(() => LoadArtwork("AutobotsIcon.png"));
+    private static readonly Lazy<Bitmap?> CompanionBitmap = new(() => LoadArtwork("BotCompanion.png"));
+
+    private static Bitmap? LoadArtwork(string name)
+    {
+        using var stream = typeof(Ui).Assembly.GetManifestResourceStream($"Autobots.Desktop.Assets.{name}");
+        return stream is null ? null : new Bitmap(stream);
+    }
+
+    public static Control BrandMark(double size) => EyesBitmap.Value is { } image
+        ? new Image { Source = image, Width = size, Height = size, Stretch = Stretch.Uniform }
+        : Icon(Icons.Autobots, size, Solid("#E9E6FF"));
+
+    public static Control Companion(double height) => CompanionBitmap.Value is { } image
+        ? new Image { Source = image, Height = height, Width = height * 0.89, Stretch = Stretch.Uniform }
+        : BrandMark(height * 0.6);
+
     public static readonly Color Accent = Color.Parse("#2EE6C8");
     public static readonly Color AccentBlue = Color.Parse("#27B4F5");
     public static readonly Color Danger = Color.Parse("#F0525C");

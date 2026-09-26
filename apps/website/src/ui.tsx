@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
+import eyesLogo from "./assets/autobots-eyes.svg";
 export const LINKEDIN = "https://www.linkedin.com/in/adarsh-viswam-95161016b/";
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -23,8 +24,12 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.spark}</svg>;
 }
 
+export function EyesLogo({ className = "" }: { className?: string }) {
+  return <img className={"eyes-logo " + className} src={eyesLogo} alt="" aria-hidden="true" width="40" height="40" />;
+}
+
 export function Brand() {
-  return <a className="brand" href="/" aria-label="Autobots home"><span className="brand-symbol"><span /><span /></span><span>autobots<span className="brand-by">by Origin Studios</span></span></a>;
+  return <a className="brand" href="/" aria-label="Autobots home"><EyesLogo /><span>autobots<span className="brand-by">by Origin Studios</span></span></a>;
 }
 
 export function Header({ developer = false }: { developer?: boolean }) {

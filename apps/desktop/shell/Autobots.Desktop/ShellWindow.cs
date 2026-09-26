@@ -120,7 +120,7 @@ public sealed class ShellWindow : Window
             CornerRadius = new CornerRadius(7),
             ClipToBounds = true,
             Child = _brandBitmap is null
-                ? Ui.Icon(Icons.Sparkle, 18, Ui.AccentBrush)
+                ? Ui.Icon(Icons.Autobots, 18, Ui.AccentBrush)
                 : new Image { Source = _brandBitmap, Stretch = Stretch.UniformToFill }
         };
         var titleText = new StackPanel
@@ -316,10 +316,10 @@ public sealed class ShellWindow : Window
             Spacing = 8,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 36),
+            Margin = new Thickness(0, 14),
             Children =
             {
-                Ui.Icon(Icons.Cursor, 30, Ui.Solid("#4D2EE6C8")),
+                Ui.Companion(94),
                 CenteredText("Nothing yet. Start a task and each step shows up here.", 13, Ui.TextTertiary)
             }
         };

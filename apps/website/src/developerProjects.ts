@@ -75,30 +75,6 @@ export const developerProjects: DeveloperProject[] = [
     stack: ["Next.js", "TypeScript", "React"],
   },
   {
-    name: "Ant Venture", repo: "antventure_website_v2", category: "Web products", kind: "Interactive brand website", mark: "Av",
-    description: "A brand experience presenting Ant Venture's Collective Intelligence approach and ROLE:X.",
-    detail: "A continuous WebGL galaxy changes shape as visitors move through the story, with cursor-reactive motion.",
-    stack: ["Next.js", "TypeScript", "WebGL"],
-  },
-  {
-    name: "Datacom", repo: "Datacom", category: "Web products", kind: "Product catalog website", mark: "Dc",
-    description: "A bilingual website for exploring network infrastructure, connectivity products, and technical resources.",
-    detail: "Includes a product finder, structured catalog, datasheet and certificate routes, and content administration.",
-    stack: ["Next.js", "TypeScript", "MongoDB"],
-  },
-  {
-    name: "Git City", repo: "git-city", category: "3D & games", kind: "GitHub visualization", mark: "Gc",
-    description: "Turns GitHub repositories and activity into an explorable 3D city of towers.",
-    detail: "Pairs a Three.js world with authentication and community chat for a more playful view of developer activity.",
-    stack: ["Next.js", "Three.js", "React Three Fiber", "Supabase"],
-  },
-  {
-    name: "Pe-Do", repo: "pe-do", category: "3D & games", kind: "Playful productivity", mark: "Pe",
-    description: "A task manager where progress helps a 3D pet grow from an egg into a legendary companion.",
-    detail: "Dragons, phoenixes, and wolves react to task progress, deadlines, and streaks with evolving visual effects.",
-    stack: ["Next.js", "TypeScript", "Three.js", "Zustand"],
-  },
-  {
     name: "Kingdom MMO", repo: "kingdom-mmo", category: "3D & games", kind: "Strategy game prototype", mark: "Km",
     description: "The foundation of a mobile multiplayer strategy game with a Unity client and an authoritative server.",
     detail: "The first server slice covers building queues, map views, marches, and deterministic combat resolution.",
@@ -123,21 +99,9 @@ export const developerProjects: DeveloperProject[] = [
     stack: ["Next.js", "TypeScript", "React"],
   },
   {
-    name: "Petgram", repo: "petgram-blog", category: "Web products", kind: "Social publishing app", mark: "Pg",
-    description: "A social app with profiles, a discovery feed, saved posts, and a space for blog content.",
-    detail: "Includes sign-in and sign-up screens alongside post creation, editing, and individual post views.",
-    stack: ["React", "TypeScript", "React Router"],
-  },
-  {
     name: "Origin Studio", repo: "origin-frontend-v1", category: "Web products", kind: "Creative studio · In progress", mark: "Os",
     description: "A workspace for creative instruments, with a Frame studio and video-editing project screens.",
     detail: "The frontend brings together account flows, project navigation, an editor surface, and a costs area.",
     stack: ["Next.js", "TypeScript", "React"],
-  },
-  {
-    name: "Personal Portfolio", repo: "portfolio-website", category: "Web products", kind: "Personal website", mark: "Av",
-    description: "An earlier personal portfolio exploring a more animated way to present development work.",
-    detail: "Built with React, Framer Motion, scroll interactions, and a component-based layout.",
-    stack: ["React", "Framer Motion", "JavaScript"],
   },
 ];

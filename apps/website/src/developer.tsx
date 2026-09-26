@@ -6,6 +6,7 @@ import { developerProjects, GITHUB, projectCategories } from "./developerProject
 import type { DeveloperProject, ProjectCategory } from "./developerProjects";
 import "./design.css";
 import "./developer.css";
+import { CareerWork } from "./CareerWork";
 
 const categoryColors: Record<ProjectCategory, string> = {
   "All projects": "violet", "AI & automation": "violet", "Developer tools": "blue",
@@ -53,7 +54,7 @@ function Developer() {
     <section className="developer-hero section" data-flight-section>
       <span className="eyebrow-pill"><span className="status-dot" /> The human behind the helpers</span>
       <h1>Adarsh Viswam.<br /><span>Always building.</span></h1>
-      <p>A self-taught software developer at <strong>Ant Venture.ai</strong><br className="desktop-break" /> and the maker of Autobots by Origin Studios.</p>
+      <p>An AI Engineer at <strong>Ant Venture.ai</strong><br className="desktop-break" /> and the maker of Autobots by Origin Studios.</p>
       <p className="developer-intro">From AI tools to playful 3D worlds, I build things that turn a little curiosity into something you can use.</p>
       <div className="hero-actions"><a className="button primary" href="#projects">Explore my work <Icon name="arrow" size={18} /></a><a className="button secondary" href={GITHUB} target="_blank" rel="noreferrer"><GitHubIcon /> @adarshnub</a></div>
       <div className="profile-coordinates">Kottayam, Kerala, India <span aria-hidden="true">↗</span> <a href={LINKEDIN} target="_blank" rel="noreferrer">Find me on LinkedIn</a></div>
@@ -62,15 +63,16 @@ function Developer() {
     <section id="about" className="section developer-story" data-flight-section>
       <div className="developer-about-layout">
         <div className="section-heading"><span className="eyebrow">A LITTLE BACKGROUND</span><h2>Curiosity starts it.<br /><span>Building makes it real.</span></h2><p>I’m Adarsh, a software developer based in Kottayam. My work spans web products, developer tools, desktop automation, and interactive experiences.</p><p>I enjoy connecting the interface you see with the systems underneath it: APIs, data, model integrations, and the details that make an idea usable.</p></div>
-        <div className="developer-profile-note"><div className="developer-monogram" aria-hidden="true">av<span>↗</span></div><span className="eyebrow">CURRENT CHAPTER</span><h3>Ant Venture.ai</h3><p>Software development</p><a href={GITHUB} target="_blank" rel="noreferrer"><GitHubIcon /> Building in public as @adarshnub <Icon name="diagonal" size={16} /></a></div>
+        <div className="developer-profile-note"><div className="developer-monogram" aria-hidden="true">av<span>↗</span></div><span className="eyebrow">CURRENT CHAPTER</span><h3>Ant Venture.ai</h3><p>AI Engineer ? May 2026?present</p><a href={GITHUB} target="_blank" rel="noreferrer"><GitHubIcon /> Building in public as @adarshnub <Icon name="diagonal" size={16} /></a></div>
       </div>
       <div className="profile-grid">
         <article><Icon name="command" size={27} /><span>Education</span><h3>Rajiv Gandhi Institute<br />of Technology</h3><p>Kottayam · 2018–2022</p></article>
         <article><Icon name="spark" size={27} /><span>Learning by doing</span><h3>The Odin Project</h3><p>Full stack development coursework, followed by a growing collection of personal projects and experiments.</p></article>
         <article><Icon name="cursor" size={27} /><span>Independent work</span><h3>Origin Studios</h3><p>Exploring desktop assistance with Autobots and creative tools through FrameOS and the Origin studio interface.</p></article>
       </div>
-      <div className="developer-focus"><span className="eyebrow">WHAT I WORK WITH</span><div>{["React & Next.js", "TypeScript", "Python", "C# & Avalonia", "AI integrations", "Three.js & WebGL", "Supabase & PostgreSQL", "AWS"].map(item => <span key={item}>{item}</span>)}</div></div>
+      <div className="developer-focus"><span className="eyebrow">WHAT I WORK WITH</span><div>{["React & Next.js", "TypeScript", "Python", "C# & Avalonia", "AI & computer vision", "React Flow & Liveblocks", "Remotion & FFmpeg", "Supabase & PostgreSQL", "AWS Lambda & SQS", "Three.js & WebGL"].map(item => <span key={item}>{item}</span>)}</div></div>
     </section>
+    <CareerWork />
     <section id="spotlight" className="section developer-spotlight" data-flight-section>
       <div className="section-heading"><span className="eyebrow">ON THE WORKBENCH</span><h2>Different ideas.<br /><span>The same urge to build.</span></h2><p>A closer look at three projects that connect intelligent tools with visible, understandable workflows.</p></div>
       <div className="spotlight-grid">

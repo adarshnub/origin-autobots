@@ -20,6 +20,7 @@ The first product slice is a typed or spoken instruction and an authenticated sc
 - Keep internal namespaces consistent with `Autobots` / `autobots`.
 - The landing-page application is a separate public website project. Its product showcase, illustrated walkthrough, developer profile and platform roadmap were commissioned after the initial blank placeholder. It has no public signup or analytics. The owner-only, unsigned Windows pilot is not a public download.
 - Keep the original handoff intact under `docs/archive/`.
+- The public product identity uses the paired-eyes mark across website and desktop icon resources. Companion art and WebGL helper robots are decorative; they do not signal task authorization. The website's voice-to-Calendar-to-WhatsApp walkthrough is explicitly simulated and never accesses user accounts, microphone or desktop input. The developer profile's current role is AI Engineer at Ant Venture.ai; the owner-selected portfolio exclusions apply to public content.
 
 ## Architecture
 

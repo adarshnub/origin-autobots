@@ -17,6 +17,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\AutobotsIcon.ico" />
     <EmbeddedResource Include="Assets\AutobotsIcon.png" />
+    <EmbeddedResource Include="Assets\BotCompanion.png" />
     <ProjectReference Include="../../core/Autobots.Core/Autobots.Core.csproj" />
     <ProjectReference Include="../../../../platforms/abstractions/Autobots.Platform.Abstractions/Autobots.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../../../platforms/windows/Autobots.Platform.Windows/Autobots.Platform.Windows.csproj" Condition="'$(OS)' == 'Windows_NT'" />
