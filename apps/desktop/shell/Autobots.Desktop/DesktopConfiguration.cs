@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 
 namespace Autobots.Desktop;
 
@@ -14,10 +15,19 @@ public sealed record DesktopConfiguration(string ApiBaseUrl, string CognitoHoste
             Path.Combine(AppContext.BaseDirectory, fileName),
             Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory, fileName)
         };
-        var path = paths.FirstOrDefault(File.Exists) ?? paths[0];
-        DesktopConfiguration? configuration = File.Exists(path)
-            ? JsonSerializer.Deserialize<DesktopConfiguration>(File.ReadAllText(path), JsonOptions)
+        // Release builds carry public endpoint identifiers inside the executable. A single-file
+        // .NET app may extract to a temporary directory, and Windows can launch an EXE directly
+        // from a ZIP without extracting the adjacent file. Neither case should break sign-in.
+        using var embedded = Assembly.GetExecutingAssembly().GetManifestResourceStream("Autobots.Desktop.PublicConfig.json");
+        DesktopConfiguration? configuration = embedded is not null
+            ? JsonSerializer.Deserialize<DesktopConfiguration>(embedded, JsonOptions)
             : null;
+        if (configuration is null)
+        {
+            var path = paths.FirstOrDefault(File.Exists);
+            if (path is not null)
+                configuration = JsonSerializer.Deserialize<DesktopConfiguration>(File.ReadAllText(path), JsonOptions);
+        }
 
         configuration = new DesktopConfiguration(
             GetConfigurationValue("AUTOBOTS_API_BASE_URL", configuration?.ApiBaseUrl),
@@ -25,11 +35,11 @@ public sealed record DesktopConfiguration(string ApiBaseUrl, string CognitoHoste
             GetConfigurationValue("AUTOBOTS_COGNITO_CLIENT_ID", configuration?.CognitoClientId));
 
         if (!Uri.TryCreate(configuration.ApiBaseUrl, UriKind.Absolute, out var apiUri) || apiUri.Scheme != Uri.UriSchemeHttps)
-            throw new InvalidOperationException($"The Autobots API URL is missing or is not HTTPS. Check autobots.dev.json beside the app at {path}.");
+            throw new InvalidOperationException("The Autobots service configuration is missing or invalid. Reinstall Autobots from the official Windows installer.");
         if (!Uri.TryCreate(configuration.CognitoHostedUiBaseUrl, UriKind.Absolute, out var hostedUiUri) || hostedUiUri.Scheme != Uri.UriSchemeHttps)
-            throw new InvalidOperationException($"The sign-in service URL is missing or is not HTTPS. Check autobots.dev.json beside the app at {path}.");
+            throw new InvalidOperationException("The Autobots sign-in configuration is missing or invalid. Reinstall Autobots from the official Windows installer.");
         if (string.IsNullOrWhiteSpace(configuration.CognitoClientId))
-            throw new InvalidOperationException($"The Autobots account client ID is missing from autobots.dev.json at {path}.");
+            throw new InvalidOperationException("The Autobots account client ID is missing. Reinstall Autobots from the official Windows installer.");
 
         return configuration with
         {

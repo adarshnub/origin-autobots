@@ -7,6 +7,7 @@ import "./downloads-enhancements.css";
 
 type Release = {
   version: string;
+  assetType?: "installer" | "zip";
   publishedAt: string;
   headline: string;
   changes: string[];
@@ -15,7 +16,9 @@ type Release = {
 };
 type Catalog = { schemaVersion: number; releases: Release[] };
 const versionPattern = /^\d+\.\d+\.\d+$/;
-const downloadPath = (version: string) => `/downloads/windows/${version}/Autobots-Windows-${version}.zip`;
+const downloadPath = (release: Release) => release.assetType === "installer"
+  ? `/downloads/windows/${release.version}/Autobots-Setup-${release.version}.exe`
+  : `/downloads/windows/${release.version}/Autobots-Windows-${release.version}.zip`;
 const api = import.meta.env.VITE_AUTOBOTS_API_URL as string | undefined;
 
 type Application = { email: string; name: string; profession: string; industry: string; purpose: string; website: string };
@@ -87,12 +90,12 @@ function Downloads() {
           <h1>Ready when<br /><em>you are.</em></h1>
           <p>Pick a version, see what changed, and take Autobots for a spin. Your Windows desktop is about to get a little more capable.</p>
           <div className="release-hero-actions">
-            {latest ? <a className="release-download release-hero-download" href={downloadPath(latest.version)} download onClick={celebrate}><Icon name="windows" size={19} /> Download latest · v{latest.version}<span>↓</span></a> : <a className="release-download release-hero-download" href="#versions">See Windows downloads <span>↓</span></a>}
+            {latest ? <a className="release-download release-hero-download" href={downloadPath(latest)} download onClick={celebrate}><Icon name="windows" size={19} /> {latest.assetType === "installer" ? "Download Windows installer" : "Download latest ZIP"} · v{latest.version}<span>↓</span></a> : <a className="release-download release-hero-download" href="#versions">See Windows downloads <span>↓</span></a>}
             <button className="release-apply-button" type="button" onClick={() => { setApplicationState("editing"); setApplicationError(""); setApplyOpen(true); }}>Apply for pilot access <span aria-hidden="true">↗</span></button>
             <a className="release-all-versions" href="#versions">See all versions <span>↗</span></a>
           </div>
           <p className="release-invite">Access is approved by Adarsh. You can also <a href={LINKEDIN} target="_blank" rel="noreferrer">reach him on LinkedIn ↗</a>.</p>
-          <div className="release-hero-foot"><span><Icon name="windows" size={16} /> Windows 11 · x64</span><span>Invite-only access</span><span>Unsigned pilot builds</span></div>
+          <div className="release-hero-foot"><span><Icon name="windows" size={16} /> Windows 11 · x64</span><span>Invite-only access</span><span>One-click setup</span></div>
         </div>
         <DownloadBot cheer={cheer} />
       </section>
@@ -101,11 +104,11 @@ function Downloads() {
         {releases.map((release, index) => <article className="release-card" key={release.version}>
           <div className="release-version"><span>{index === 0 ? "LATEST RELEASE" : "PREVIOUS RELEASE"}</span><strong>v{release.version}</strong><small>{new Date(release.publishedAt).toLocaleDateString("en", { day: "numeric", month: "long", year: "numeric" })} · {(release.sizeBytes / 1048576).toFixed(1)} MiB</small></div>
           <div className="release-details"><h3>{release.headline}</h3><ul>{release.changes.map(change => <li key={change}>{change}</li>)}</ul></div>
-          <div className="release-action"><a className="release-download" href={downloadPath(release.version)} download onClick={celebrate}><Icon name="windows" size={19} /> Download v{release.version} <span>↓</span></a></div>
+          <div className="release-action"><a className="release-download" href={downloadPath(release)} download onClick={celebrate}><Icon name="windows" size={19} /> {release.assetType === "installer" ? "Download installer" : "Download ZIP"} · v{release.version} <span>↓</span></a></div>
         </article>)}
         {!status && releases.length === 0 && <div className="release-status">No public Windows pilot versions have been published yet.</div>}
       </section>
-      <section className="release-steps"><span className="release-kicker">AFTER DOWNLOADING</span><h2>Three little steps.</h2><div><article><b>01</b><h3>Unzip it.</h3><p>Extract the Windows ZIP to a folder you control, then open Autobots.Desktop.exe.</p></article><article><b>02</b><h3>Sign in.</h3><p>Use your invited email. Choose a permanent password at first sign-in and complete your pilot profile.</p></article><article><b>03</b><h3>Give it a task.</h3><p>Type or speak a clear task, watch the visible steps, and use STOP whenever you need.</p></article></div><p className="release-note">The build is unsigned, so Windows may ask you to review it before opening. Your account is managed through the <a href="/pilot/index.html">pilot portal</a>. For an invitation, <a href={LINKEDIN} target="_blank" rel="noreferrer">message Adarsh on LinkedIn</a>.</p></section>
+      <section className="release-steps"><span className="release-kicker">AFTER DOWNLOADING</span><h2>Three little steps.</h2><div><article><b>01</b><h3>Open setup.</h3><p>Open the downloaded installer once. It installs Autobots for your Windows account, adds it to Start, and opens the app. Older ZIP releases require extraction.</p></article><article><b>02</b><h3>Sign in.</h3><p>Use your invited email. Choose a permanent password at first sign-in and complete your pilot profile.</p></article><article><b>03</b><h3>Give it a task.</h3><p>Type or speak a clear task, watch the visible steps, and use STOP whenever you need.</p></article></div><p className="release-note">The pilot installer is unsigned, so Windows may ask you to review it before opening. Your account is managed through the <a href="/pilot/index.html">pilot portal</a>. For an invitation, <a href={LINKEDIN} target="_blank" rel="noreferrer">message Adarsh on LinkedIn</a>.</p></section>
     </main><footer className="release-footer"><span>Autobots by Origin Studios</span><a href="/">Back to the experience ↑</a></footer>
     <dialog className="pilot-apply-dialog" ref={applicationDialog} onClose={() => setApplyOpen(false)} onClick={event => { if (event.target === applicationDialog.current) setApplyOpen(false); }} aria-labelledby="pilot-apply-title">
       <div className="pilot-apply-content">

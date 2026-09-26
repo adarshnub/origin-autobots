@@ -4,7 +4,7 @@
     <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net10.0-windows10.0.19041.0</TargetFramework>
     <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net10.0</TargetFramework>
     <AssemblyName>Autobots.Desktop</AssemblyName>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
     <RootNamespace>Autobots.Desktop</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest Condition="'$(OS)' == 'Windows_NT'">app.manifest</ApplicationManifest>
@@ -19,6 +19,7 @@
     <EmbeddedResource Include="Assets\AutobotsIcon.ico" />
     <EmbeddedResource Include="Assets\AutobotsIcon.png" />
     <EmbeddedResource Include="Assets\BotCompanion.png" />
+    <EmbeddedResource Include="$(AutobotsPublicConfigPath)" LogicalName="Autobots.Desktop.PublicConfig.json" Condition="'$(AutobotsPublicConfigPath)' != ''" />
     <ProjectReference Include="../../core/Autobots.Core/Autobots.Core.csproj" />
     <ProjectReference Include="../../../../platforms/abstractions/Autobots.Platform.Abstractions/Autobots.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../../../platforms/windows/Autobots.Platform.Windows/Autobots.Platform.Windows.csproj" Condition="'$(OS)' == 'Windows_NT'" />

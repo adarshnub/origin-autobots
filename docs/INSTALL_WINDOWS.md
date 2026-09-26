@@ -1,10 +1,10 @@
 # Install and use Autobots on Windows
 
-This self-contained Windows x64 pilot bundle connects to the invite-only Autobots API. AWS Cognito manages sign-in. The executable is unsigned. Downloading the ZIP does not grant account access; the owner must invite your email first.
+The self-contained Windows x64 pilot installer connects to the invite-only Autobots API. AWS Cognito manages sign-in. The installer is unsigned. Downloading it does not grant account access; the owner must invite your email first.
 
 ## First run
 
-1. Extract the ZIP to a folder you control and run `Autobots.Desktop.exe`.
+1. Open the downloaded `Autobots-Setup-<version>.exe` once. Setup installs Autobots for your Windows account, adds a Start menu shortcut and opens the app automatically. You can later remove it through Windows **Installed apps**. Older ZIP releases still require extraction.
 2. Choose **Connect account** and sign in to your Autobots account in the browser. It is separate from Google or other app sign-ins. Complete the temporary-password change if this is your first sign-in, then complete your username and purpose at the [pilot portal](https://autobots.origin-studio.in/pilot/index.html) before starting a task.
 3. Sign in to the websites and apps you want Autobots to use yourself (for browser tasks, the intended Google account in that browser).
 4. Type a task, or press the mic (or `Ctrl+Alt+Space` from any app) and say it. Choose **Start** (or `Ctrl+Enter`). Submitting authorizes screen capture and mouse/keyboard input for that task only.
@@ -29,6 +29,6 @@ This pilot uses screenshot-based browser interaction; it has no browser extensio
 
 The API runs on one development EC2 instance with SQLite. Local STOP works without the API, but cloud task-stop acknowledgement, model steps and transcription need the network. Sign-in tokens stay in app memory and are not written to disk; settings (limits and toggles only) are stored in `%LOCALAPPDATA%\Origin Studios\Autobots\settings.json`.
 
-To rebuild the bundle after updating the deployed API, run `scripts/package_windows_app.ps1` from PowerShell in the repository. The API URL and public Cognito app-client ID come from Terraform outputs; the app bundle contains no cloud credentials.
+To rebuild after updating the deployed API, run `scripts/package_windows_app.ps1`, then `scripts/package_windows_installer.ps1` against its bundle directory. The API URL and public Cognito app-client ID come from Terraform outputs and are embedded in the executable; no sidecar file is required. The app contains no cloud credentials.
 
 The owner Autobots account is managed by Cognito and was created by `scripts/bootstrap_cognito_owner.ps1`; its temporary-password invitation was sent to the owner email configured in the private Terraform variables.

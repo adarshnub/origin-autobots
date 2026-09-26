@@ -1,5 +1,9 @@
 # Capability and toolchain findings
 
+## Windows installer capability — 27 September 2026
+
+The pinned .NET 10 SDK includes the Windows Desktop targeting pack, so a self-contained Windows Forms setup executable could be built without installing a third-party packaging tool. Inno Setup and NSIS were not present. The previous public Windows releases were ZIPs with a separate `autobots.dev.json`; a single-file app launched through a temporary extraction path could not reliably find that adjacent configuration. Version 0.6.3 embeds only public endpoint/client identifiers in the desktop executable and publishes a per-user installer. The build and AWS publication completed, but installation, upgrade, uninstall and first-run behavior have not been exercised on a clean account. The installer remains unsigned.
+
 ## Current communication boundary — 26 September 2026
 
 The fresh Calendar event was created and its copied conference details verified title, 30 September 2026 2:00–2:15 PM Asia/Kolkata and Meet URL. The signed-in WhatsApp desktop chat was reached, but Google's Vertex Computer Use response required human confirmation for message typing; the product stopped the run without sending. The pinned `google-genai==2.25.0` type describes `disabled_safety_policies` as unsupported on Vertex AI, and Google's Vertex documentation requires end-user confirmation for `require_confirmation`. A bounded retry now handles transient 5xx proposal failures but does not override safety decisions.

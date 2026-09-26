@@ -15,7 +15,7 @@ The build script reads the API and public Cognito client values from the existin
 
 ## Windows releases
 
-Versioned ZIPs live under `s3://<website-bucket>/downloads/windows/<version>/` and are served by CloudFront. The small `downloads/releases.json` catalog, also in S3, drives the downloads page. Release notes are reviewed as JSON in `releases/windows/`. App ZIPs are local ignored `artifacts/` files until published; `.gitignore` excludes them.
+Versioned Windows packages live under `s3://<website-bucket>/downloads/windows/<version>/` and are served by CloudFront. New releases use an installer EXE; older ZIPs remain available. The small `downloads/releases.json` catalog, also in S3, drives the downloads page. Release notes are reviewed as JSON in `releases/windows/`. Package binaries are local ignored `artifacts/` files until published; `.gitignore` excludes them.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package_windows_app.ps1 -ReleaseName Autobots-Windows-0.5.0 -NoRestore

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Autobots.Setup</AssemblyName>
+    <ApplicationIcon>../../desktop/shell/Autobots.Desktop/Assets/AutobotsIcon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(AutobotsPayloadZip)" LogicalName="Autobots.Setup.payload.zip" Condition="'$(AutobotsPayloadZip)' != ''" />
+  </ItemGroup>
+  <Target Name="RequireInstallerPayload" BeforeTargets="CoreCompile" Condition="'$(AutobotsPayloadZip)' == '' Or !Exists('$(AutobotsPayloadZip)')">
+    <Error Text="Set AutobotsPayloadZip to the reviewed Windows application payload ZIP." />
+  </Target>
+</Project>

@@ -1,6 +1,17 @@
 # Implementation status
 
-Updated 26 September 2026.
+Updated 27 September 2026.
+
+## Windows v0.6.3 installer and startup configuration
+
+- **Components:** The production desktop executable now embeds its public API URL, Cognito hosted UI URL and client ID at publish time, with the developer sidecar file retained only as a fallback for builds without an embedded configuration. Added a self-contained per-user Windows setup executable. Opening it installs the app under the current user's Local AppData, adds a Start menu shortcut and Windows Installed Apps uninstall entry, then launches Autobots. The release catalog and downloads page now distinguish installer EXEs from older ZIP versions.
+- **Commands and evidence:** `scripts/package_windows_app.ps1 -ReleaseName Autobots-Windows-0.6.3 -NoRestore` built the desktop bundle. `scripts/package_windows_installer.ps1 -BundleDir artifacts/Autobots-Windows-0.6.3-20260927-024938 -Version 0.6.3 -Rebuild` built the 202,860,802-byte setup executable. `scripts/build_website_pilot.ps1` completed the TypeScript/Vite production build. `scripts/deploy_website_aws.ps1` and `scripts/publish_windows_release.ps1` uploaded the site and the immutable v0.6.3 installer to the existing website S3 bucket. CloudFront invalidations `IACGLODEP5FXBU9TKCKZSO56QF` and `IEXRBW7EUKNOJT6VOQBMW67N2Z` reported Completed. Public installer: `https://autobots.origin-studio.in/downloads/windows/0.6.3/Autobots-Setup-0.6.3.exe`.
+- **Tests actually executed:** None. Builds and release packaging were performed; the installer was not run on this Windows device and the installed app was not launched as part of this change.
+- **Skipped checks:** Clean-machine install, upgrade, Start menu launch, uninstall, account sign-in, browser download, and live desktop input. The reported startup error came from the owner's screenshot; the root cause was inferred from the previous sidecar-only packaging and temporary single-file extraction path.
+- **Limitations:** This pilot installer is unsigned, so Windows may show its unrecognized-app warning. An already running Autobots process must be closed from its tray menu before upgrade; setup refuses to replace a running app. Windows requires the user to open the downloaded installer once; a webpage cannot silently install a desktop application.
+- **Cloud resources changed:** Versioned installer object, latest setup alias and release catalog in the existing website S3 bucket; four static site pages/assets and CloudFront cache invalidations. No API, Cognito, Terraform or model provider resources changed.
+- **Measured metrics:** Installer size 202,860,802 bytes. Vite production build completed in 1.01 seconds. No installation time or runtime startup metrics were collected.
+- **Next task:** Qualify the setup, upgrade and uninstall flow on a clean Windows account and verify first sign-in before a signed broad release.
 
 ## Latest — public pilot applications and revocation (API v0.6.0, Windows v0.6.2)
 

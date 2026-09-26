@@ -1,0 +1,11 @@
+{
+  "version": "0.6.3",
+  "platform": "windows",
+  "publishedAt": "2026-09-26T21:21:00Z",
+  "headline": "Windows installer and reliable first launch",
+  "changes": [
+    "Download one setup app that installs Autobots for your Windows account and opens it automatically.",
+    "Find Autobots in the Start menu and uninstall it from Windows Installed Apps.",
+    "Production API and sign-in settings travel inside the app, fixing the missing configuration error."
+  ]
+}
