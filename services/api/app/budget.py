@@ -22,7 +22,7 @@ def _money(value: Decimal | int | float | str) -> Decimal:
 class BudgetLimits:
     per_task_usd: Decimal = Decimal("1.00")
     per_day_usd: Decimal = Decimal("5.00")
-    per_month_usd: Decimal = Decimal("50.00")
+    per_month_usd: Decimal = Decimal("100.00")
 
     def __post_init__(self) -> None:
         if min(self.per_task_usd, self.per_day_usd, self.per_month_usd) <= 0:

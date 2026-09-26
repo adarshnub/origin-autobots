@@ -18,6 +18,10 @@
   <ItemGroup>
     <Compile Include="../../shell/Autobots.Desktop/AgentRunLog.cs" Link="AgentRunLog.cs" />
     <Compile Include="../../shell/Autobots.Desktop/RepeatedClickGuard.cs" Link="RepeatedClickGuard.cs" />
+    <Compile Include="../../shell/Autobots.Desktop/OwnerResumeGate.cs" Link="OwnerResumeGate.cs" />
+    <Compile Include="../../shell/Autobots.Desktop/CalendarFieldLoopGuard.cs" Link="CalendarFieldLoopGuard.cs" />
+    <Compile Include="../../shell/Autobots.Desktop/CalendarTaskTiming.cs" Link="CalendarTaskTiming.cs" />
+    <Compile Include="../../shell/Autobots.Desktop/AppSettings.cs" Link="AppSettings.cs" />
     <Content Include="../../../../packages/contracts/fixtures/action-click.v1.json" Link="action-click.v1.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../../packages/contracts/fixtures/action-drag.v1.json" Link="action-drag.v1.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../../packages/contracts/fixtures/action-type-enter.v1.json" Link="action-type-enter.v1.json" CopyToOutputDirectory="PreserveNewest" />

@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 using Autobots.Contracts;
 using Autobots.Platform;
+using UiAutomation = System.Windows.Automation;
 using DragAction = Autobots.Contracts.DragAction;
 
 namespace Autobots.Platform.Windows;
@@ -132,6 +133,7 @@ public sealed class WindowsDesktopAdapter(
         var (imageWidth, imageHeight) = DisplayCoordinateTransform.FitWithin(bounds.Width, bounds.Height, MaxImageWidth, MaxImageHeight);
         var image = EncodeJpeg(bitmap, imageWidth, imageHeight);
 
+        var foregroundTitle = WindowTitle(foregroundWindow);
         return new CapturedFrame(
             ObservationId: Guid.NewGuid().ToString("D"),
             CapturedAt: capturedAt,
@@ -148,15 +150,57 @@ public sealed class WindowsDesktopAdapter(
             DpiY: dpi,
             ForegroundWindowHandle: foregroundWindow,
             ForegroundProcessId: foregroundProcessId,
-            ForegroundWindowTitle: WindowTitle(foregroundWindow),
+            ForegroundWindowTitle: foregroundTitle,
             LayoutGeneration: GetLayoutGeneration(fingerprint),
             ImageWidth: imageWidth,
             ImageHeight: imageHeight,
             ImageMimeType: "image/jpeg",
             ImageBytes: image)
         {
-            ForegroundProcessName = WindowsProcessIntegrity.FriendlyName(foregroundProcessId)
+            ForegroundProcessName = WindowsProcessIntegrity.FriendlyName(foregroundProcessId),
+            CalendarFields = ReadCalendarEventFields(foregroundWindow, foregroundTitle, bounds)
         };
+    }
+
+    private static CalendarEventFields? ReadCalendarEventFields(nint window, string title, Rectangle displayBounds)
+    {
+        if (!title.Contains("Google Calendar", StringComparison.OrdinalIgnoreCase) ||
+            !(title.Contains("Event details", StringComparison.OrdinalIgnoreCase) ||
+              title.Contains("Create event", StringComparison.OrdinalIgnoreCase) ||
+              title.Contains("Edit event", StringComparison.OrdinalIgnoreCase)))
+            return null;
+        try
+        {
+            var root = UiAutomation.AutomationElement.FromHandle(window);
+            var names = new[] { "Start date", "Start time", "End date", "End time" };
+            var conditions = names.Select(name => (UiAutomation.Condition)new UiAutomation.PropertyCondition(
+                UiAutomation.AutomationElement.NameProperty, name)).ToArray();
+            var fields = root.FindAll(UiAutomation.TreeScope.Descendants, new UiAutomation.OrCondition(conditions));
+            var values = new Dictionary<string, CalendarEditorField>(StringComparer.Ordinal);
+            foreach (UiAutomation.AutomationElement field in fields)
+            {
+                if (!field.TryGetCurrentPattern(UiAutomation.ValuePattern.Pattern, out var pattern))
+                    continue;
+                var value = ((UiAutomation.ValuePattern)pattern).Current.Value;
+                var rectangle = field.Current.BoundingRectangle;
+                var centerX = rectangle.Left + rectangle.Width / 2;
+                var centerY = rectangle.Top + rectangle.Height / 2;
+                if (string.IsNullOrWhiteSpace(value) || rectangle.IsEmpty || field.Current.IsOffscreen ||
+                    centerX < displayBounds.Left || centerX >= displayBounds.Right ||
+                    centerY < displayBounds.Top || centerY >= displayBounds.Bottom)
+                    continue;
+                var x = (int)Math.Round((centerX - displayBounds.Left) * 999d / displayBounds.Width);
+                var y = (int)Math.Round((centerY - displayBounds.Top) * 999d / displayBounds.Height);
+                values[field.Current.Name] = new CalendarEditorField(value.Length <= 64 ? value : value[..64], x, y);
+            }
+            if (GetForegroundWindow() != window || names.Any(name => !values.ContainsKey(name)))
+                return null;
+            return new CalendarEventFields(values["Start date"], values["Start time"], values["End date"], values["End time"]);
+        }
+        catch (Exception error) when (error is UiAutomation.ElementNotAvailableException or InvalidOperationException or COMException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

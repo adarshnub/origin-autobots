@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import os
 import time
 from decimal import Decimal
@@ -27,15 +28,16 @@ from services.api.app.storage import IdempotencyConflict, SQLiteTaskStore, Store
 from services.api.app.usage import UsageStore, aws_billing
 
 
-API_VERSION = "0.4.0"
+API_VERSION = "0.4.2"
 # Advertised so the desktop client can detect an older deployed API and omit newer request fields.
-API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting")
+API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting", "calendar-field-observation")
 
 app = FastAPI(
     title="Autobots by Origin Studios API",
     version=API_VERSION,
     description="Owner-only control plane. The local supervisor remains authoritative for all desktop input.",
 )
+logger = logging.getLogger(__name__)
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -72,8 +74,17 @@ class StepHistoryEntry(StrictModel):
 
     step: int = Field(ge=1, le=1000)
     action: str = Field(min_length=1, max_length=300)
-    outcome: Literal["executed", "rejected", "failed"]
+    outcome: Literal["executed", "rejected", "failed", "owner_resumed", "verified"]
     detail: str | None = Field(default=None, max_length=300)
+
+
+class CalendarFieldObservation(StrictModel):
+    """Only four date/time values from the active Calendar editor; untrusted observation data."""
+
+    start_date: str = Field(min_length=1, max_length=64)
+    start_time: str = Field(min_length=1, max_length=64)
+    end_date: str = Field(min_length=1, max_length=64)
+    end_time: str = Field(min_length=1, max_length=64)
 
 
 class ActionProposalRequest(StrictModel):
@@ -86,6 +97,7 @@ class ActionProposalRequest(StrictModel):
     image_base64: str = Field(min_length=16, max_length=4_000_000)
     history: list[StepHistoryEntry] = Field(default_factory=list, max_length=15)
     foreground_title: str | None = Field(default=None, max_length=300)
+    calendar_fields: CalendarFieldObservation | None = None
 
 
 class ActionProposalResponse(StrictModel):
@@ -119,9 +131,9 @@ class TranscriptionResponse(StrictModel):
 
 def _budget_limits() -> BudgetLimits:
     return BudgetLimits(
-        per_task_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_TASK", "0.25")),
-        per_day_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_DAY", "0.50")),
-        per_month_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_MONTH", "20.00")),
+        per_task_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_TASK", "1.00")),
+        per_day_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_DAY", "5.00")),
+        per_month_usd=Decimal(os.getenv("AUTOBOTS_MAX_MODEL_COST_USD_PER_MONTH", "100.00")),
     )
 
 
@@ -278,13 +290,14 @@ async def propose_action(
             image_mime_type=request.image_mime_type,
             history=[StepRecord(entry.step, entry.action, entry.outcome, entry.detail) for entry in request.history],
             foreground_title=request.foreground_title,
+            calendar_fields=request.calendar_fields.model_dump() if request.calendar_fields is not None else None,
         )
     except OwnerConfirmationRequired as error:
         usage.record(reservation, principal.subject, "desktop", "confirmation_required", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         store.record_event(principal.subject, task_id, "provider_confirmation_required", {"epoch": request.epoch, "sequence": request.sequence})
-        raise HTTPException(status_code=409, detail={"code": "owner_confirmation_required"}) from error
+        raise HTTPException(status_code=409, detail={"code": "owner_confirmation_required", "reason": _safe_reason(error)}) from error
     except ProposalUnavailable as error:
         usage.record(reservation, principal.subject, "desktop", "rejected", request_started)
         if reservation:
@@ -297,6 +310,13 @@ async def propose_action(
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         raise
     except Exception as error:
+        # The provider error text can contain request or response content. Log only its type and
+        # numeric status so a failed live run is diagnosable without exposing screen data.
+        provider_status = getattr(error, "code", None)
+        if not isinstance(provider_status, int):
+            provider_status = getattr(error, "status_code", None)
+        logger.warning("desktop_provider_error class=%s status=%s", type(error).__name__,
+                       provider_status if isinstance(provider_status, int) else "unknown")
         usage.record(reservation, principal.subject, "desktop", "provider_error", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))

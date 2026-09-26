@@ -12,6 +12,18 @@ from services.api.app.persistent_budget import SQLiteBudgetLedger
 from services.api.app.storage import SQLiteTaskStore
 from packages.contracts.generated.python.action import ActionEnvelope, ClickAction
 
+def test_owner_requested_default_model_budget_limits(monkeypatch) -> None:
+    for name in (
+        "AUTOBOTS_MAX_MODEL_COST_USD_PER_TASK",
+        "AUTOBOTS_MAX_MODEL_COST_USD_PER_DAY",
+        "AUTOBOTS_MAX_MODEL_COST_USD_PER_MONTH",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    limits = main._budget_limits()
+    assert (limits.per_task_usd, limits.per_day_usd, limits.per_month_usd) == (
+        Decimal("1.00"), Decimal("5.00"), Decimal("100.00")
+    )
+
 
 client = TestClient(main.app)
 
@@ -148,11 +160,13 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
 
         last_history = None
         last_title = None
+        last_calendar_fields = None
 
         async def propose_action(self, **kwargs):
             self.calls += 1
             self.last_history = list(kwargs["history"])
             self.last_title = kwargs["foreground_title"]
+            self.last_calendar_fields = kwargs["calendar_fields"]
             assert kwargs["image_bytes"] == png
             if self.needs_input_next:
                 return SimpleNamespace(
@@ -228,11 +242,19 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
                 "image_base64": base64.b64encode(png).decode("ascii"),
                 "history": [{"step": 1, "action": "click (500, 500)", "outcome": "executed"}],
                 "foreground_title": "Synthetic window",
+                "calendar_fields": {
+                    "start_date": "Sep 27, 2026", "start_time": "11:00am",
+                    "end_date": "Sep 27, 2026", "end_time": "11:15am",
+                },
             },
         )
         assert completion_response.status_code == 200
         assert [(entry.step, entry.outcome) for entry in provider.last_history] == [(1, "executed")]
         assert provider.last_title == "Synthetic window"
+        assert provider.last_calendar_fields == {
+            "start_date": "Sep 27, 2026", "start_time": "11:00am",
+            "end_date": "Sep 27, 2026", "end_time": "11:15am",
+        }
         assert completion_response.json()["status"] == "completed"
         assert completion_response.json()["proposal"] is None
         assert completion_response.json()["completion_message"] == "The requested view is visible."
@@ -294,6 +316,10 @@ def test_step_history_is_bounded_and_typed(monkeypatch, tmp_path) -> None:
             **base, "history": [{"step": 1, "action": "click", "outcome": "approved_by_page"}],
         })
         assert invalid_outcome.status_code == 422
+        resumed = main.ActionProposalRequest.model_validate({
+            **base, "history": [{"step": 1, "action": "Owner chose Resume after a visible handoff", "outcome": "owner_resumed"}],
+        })
+        assert resumed.history[0].outcome == "owner_resumed"
         too_long = client.post(f"/v1/tasks/{task.task_id}/proposals", json={
             **base, "history": [{"step": index + 1, "action": "wait", "outcome": "executed"} for index in range(16)],
         })

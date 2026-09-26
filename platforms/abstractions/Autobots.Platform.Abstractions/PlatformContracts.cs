@@ -10,6 +10,10 @@ public sealed record DesktopCapabilities(
     bool SecureCredentialStore,
     string[] Limitations);
 
+/// <summary>Read-only values exposed by the active Calendar event editor's accessibility tree.</summary>
+public sealed record CalendarEditorField(string Value, int X, int Y);
+public sealed record CalendarEventFields(CalendarEditorField StartDate, CalendarEditorField StartTime, CalendarEditorField EndDate, CalendarEditorField EndTime);
+
 /// <summary>
 /// One observation of the display. <see cref="PixelWidth"/>/<see cref="PixelHeight"/> are the physical
 /// display pixels that normalized coordinates map onto; <see cref="ImageWidth"/>/<see cref="ImageHeight"/>
@@ -39,6 +43,7 @@ public sealed record CapturedFrame(
     byte[] ImageBytes)
 {
     public string ForegroundProcessName { get; init; } = string.Empty;
+    public CalendarEventFields? CalendarFields { get; init; }
 }
 
 /// <summary>

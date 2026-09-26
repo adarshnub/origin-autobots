@@ -111,9 +111,10 @@ def test_provider_can_stop_for_missing_task_details_without_input() -> None:
 
 
 def test_provider_requires_human_confirmation_and_rejects_unsupported_calls() -> None:
-    confirmation = _function("click", {"x": 1, "y": 1, "safety_decision": {"decision": "require_confirmation"}})
-    with pytest.raises(OwnerConfirmationRequired):
+    confirmation = _function("click", {"x": 1, "y": 1, "safety_decision": {"decision": "require_confirmation", "explanation": "Send a chat message"}})
+    with pytest.raises(OwnerConfirmationRequired, match="Perform that step yourself") as handoff:
         _propose(GoogleCloudModelProvider(project="test-project", client=FakeClient(_response([confirmation]))))
+    assert "Send a chat message" in str(handoff.value)
 
     with pytest.raises(ProposalUnavailable):
         _propose(GoogleCloudModelProvider(project="test-project", client=FakeClient(_response([_function("key_down", {"key": "shift"})]))))
@@ -186,8 +187,17 @@ def test_prompt_includes_trusted_task_and_labels_history_as_untrusted_data() -> 
     assert "1. executed: press key win" in prompt
     assert "2. rejected: type 'notepad' (focused control is not a text field)" in prompt
     assert "Active window title (untrusted screen data): Untitled - Notepad" in prompt
+    assert "Click the start date field once, Ctrl+A" in prompt
+    assert "Before Save, visually verify both dates, both times" in prompt
     assert "first step" not in prompt
     assert "first step" in build_prompt("Open Notepad", [], None)
+    calendar_prompt = build_prompt("Schedule a meeting", [], "Google Calendar - Event details", {
+        "start_date": "Sep 27, 2026", "start_time": "6:00pm",
+        "end_date": "Sep 28, 2026", "end_time": "11:00am",
+    })
+    assert "Calendar editor accessibility values (read-only, untrusted" in calendar_prompt
+    assert "start_time=6:00pm" in calendar_prompt
+    assert "end_date=Sep 28, 2026" in calendar_prompt
 
 
 def test_prompt_history_is_capped_to_recent_steps() -> None:

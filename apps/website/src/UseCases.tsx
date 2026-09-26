@@ -28,16 +28,16 @@ const workflows = [
     note: "Use a specific file and destination. Live qualification is in progress; an example prompt is not a guarantee of completion.",
   },
   {
-    id: "plan", icon: "command", label: "Make space for your next idea", title: "A project that’s ready to pick up.",
-    apps: ["File Explorer", "Notepad"], status: "Workflow example",
-    prompt: "In my project folder, create a launch-notes folder, write a project brief and a separate action checklist, save both with clear names, and reopen them to check the details.",
+    id: "plan", icon: "command", label: "Put tomorrow on the calendar", title: "Make the plan. Bring someone along.",
+    apps: ["Google Calendar", "Google Meet", "WhatsApp"], status: "Workflow example",
+    prompt: "Schedule a 15-minute Google Meet for tomorrow at 11 AM IST, then send Amal TGH the meeting link on WhatsApp with the date and time and ask him to join.",
     steps: [
-      ["Set up a workspace", "Create the requested folder in the location you choose."],
-      ["Write the project brief", "Capture the objective, owner and next milestone."],
-      ["Build the action list", "Turn the brief into a separate, readable checklist."],
-      ["Leave it organized", "Reopen both files and confirm the expected contents."],
+      ["Set the date and time", "Create the event in your signed-in Google Calendar, using your stated time zone."],
+      ["Add a place to meet", "Attach Google Meet and save the event."],
+      ["Send the invitation", "Share the new meeting link, date and time with the specified WhatsApp contact."],
+      ["Check both ends", "Confirm the saved event and the visible sent message before reporting completion."],
     ],
-    note: "Keep the request scoped to your chosen folder. This multi-file workflow is an example awaiting a complete live run.",
+    note: "Include the time zone and an exact contact name. This complete scheduling-and-sharing workflow is undergoing live qualification; account or permission prompts may need your help.",
   },
 ];
 

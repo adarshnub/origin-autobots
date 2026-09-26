@@ -2,7 +2,17 @@
 
 Updated 26 September 2026.
 
+## Latest — Calendar qualification, limits and website copy
+
+- The owner raised desktop inference limits to $1/task, $5/UTC day and $100/UTC month. The running AWS API process was checked for those exact values; separate speech limits stayed unchanged. API 0.4.2 was deployed with sanitized provider-error diagnostics and passed its public live health check.
+- The desktop now defaults to 100 actions per task and allows 5–200 in settings, with the existing 10-minute default. A transient API 502 now triggers at most two retries with fresh screenshots and no native input on the failed requests. The desktop build succeeded and 83 local .NET tests passed.
+- A fresh 30 September 2026 Google Calendar test event was saved. Copied conference details independently showed the exact title, 2:00–2:15 PM Asia/Kolkata and Meet URL. The date/time adapter verified all four accessible fields before Save. Sharing to Amal Tgh remains at a Google Computer Use owner-confirmation handoff; no automated WhatsApp send is claimed.
+- The landing hero now asks “What if your cursor had eyes and a brain?” and describes visible Windows screen, mouse and keyboard operation with local STOP. The Vite build passed and AWS CloudFront invalidation `I51T9WKO6405Y33B3ZA87BAU6J` completed for `https://autobots.origin-studio.in`. No browser visual inspection was run for this copy change.
+- See [live qualification log](testing-2026-09-26.md) for exact run outcomes, commands, cloud changes, skipped checks and remaining work. The chronological sections below retain their original historical evidence.
+
 ## 26 September 2026 — live QA, text editing and usage reporting
+
+The owner then stopped further Notepad testing and requested two live meeting flows: create/join/share a new Meet and schedule/share a later Meet with Amal TGH via WhatsApp desktop. The first run created a Meet URL but hit a Firefox camera/microphone permission prompt before the join or send. The app now exposes Resume and Stop during this handoff. Resume keeps the original task, device lease and instruction, waits for the owner to handle the prompt, then captures a fresh screen. It never treats the provider's confirmation request as permission for native input. The owner is handling the prompt in an active continuation run; see the live log for the eventual result. The scheduling test uses the owner-approved arbitrary values 27 September 2026, 11:00–11:15 IST. No message has been verified sent yet.
 
 - Owner-authorized native runs use disposable files and the normal product task grant/lease. Full results, failures, commands, metrics and skipped checks: [live qualification log](testing-2026-09-26.md). Earlier no-live-test entries below are historical.
 - Added opt-in local action diagnostics, measured pointer arrival before clicks, precise text-edit guidance and a File-menu fallback for intercepted shortcuts. Fixed local/server epoch confusion, composer Alt+Tab interference, repeated hotkey registration and `Super_L` key parsing. STOP and focus/lease validation remain enforced.

@@ -39,5 +39,5 @@ export function Header({ developer = false }: { developer?: boolean }) {
 }
 
 export function Footer() {
-  return <footer className="site-footer"><Brand /><p>A little help. A lot more possible.</p><div><a href="/developer/index.html">Meet the maker</a><a href={LINKEDIN} target="_blank" rel="noreferrer">LinkedIn <Icon name="diagonal" size={14} /></a><a href="#top">Back to top ↑</a></div><small>© {new Date().getFullYear()} Origin Studios</small></footer>;
+  return <footer className="site-footer"><Brand /><p>See the work. Stay in control.</p><div><a href="/developer/index.html">Meet the maker</a><a href={LINKEDIN} target="_blank" rel="noreferrer">LinkedIn <Icon name="diagonal" size={14} /></a><a href="#top">Back to top ↑</a></div><small>© {new Date().getFullYear()} Origin Studios</small></footer>;
 }

@@ -1,5 +1,13 @@
 # Capability and toolchain findings
 
+## Current communication boundary — 26 September 2026
+
+The fresh Calendar event was created and its copied conference details verified title, 30 September 2026 2:00–2:15 PM Asia/Kolkata and Meet URL. The signed-in WhatsApp desktop chat was reached, but Google's Vertex Computer Use response required human confirmation for message typing; the product stopped the run without sending. The pinned `google-genai==2.25.0` type describes `disabled_safety_policies` as unsupported on Vertex AI, and Google's Vertex documentation requires end-user confirmation for `require_confirmation`. A bounded retry now handles transient 5xx proposal failures but does not override safety decisions.
+
+Read-only investigation found the WhatsApp desktop UI Automation tree exposes only window chrome (8 descendants), not the chat header or composer. Windows' built-in OCR engine is available and recognized the visible chat header and composer in a local screenshot probe; a guarded native messaging adapter has **not** been implemented or qualified. The app must not infer that an unverified chat or message was sent. No WhatsApp Business API credentials or other independent messaging connector are configured.
+
+A local [reviewed-paste helper](../scripts/whatsapp/README.md) now accepts an owner-supplied UTF-8 message file and recipient label, requires an explicit `PASTE` confirmation and an owner hotkey in the selected WhatsApp Desktop chat, and sends only Ctrl+V. It does not send the message, verify the recipient or integrate with the paused provider proposal. It has not been exercised against the live WhatsApp app. It cannot be automatically invoked to avoid a provider `require_confirmation` decision.
+
 ## Live qualification and usage — 26 September 2026
 
 Explicit owner authorization enabled bounded live QA through the product UI on disposable files. Cognito browser sign-in, real model proposals, primary-display capture, native input, pointer diagnostics, the pilot STOP button and the private usage screen were exercised. See [test evidence](testing-2026-09-26.md); earlier skipped-live statements below describe previous passes.
@@ -56,7 +64,7 @@ Checked 25 September 2026; desktop behavior updated 26 September 2026. This reco
 - A read-only SSM check on the EC2 host exchanged its instance role credentials for a short-lived GCP token through the deployed workload identity federation. No model request was part of this check.
 - A separate local GCP probe used a synthetic 1×1 image and Gemini 3.5 Flash-Lite. It returned zero calls for a no-action prompt and one normalized click proposal for a center-click prompt. Neither proposal was executed.
 - Gemini computer use is preview. The selected model is the lowest-cost model currently documented as supporting computer use; the cheaper Flash-Lite generation does not support this tool. It uses global Vertex processing, which is not an India-only data-residency guarantee.
-- The API's SQLite ledger limits inference to $0.25/task, $0.50/day and $20/month. They protect requests routed through this API; they do not cap other GCP project spend or guarantee the provider's final bill.
+- The API's SQLite ledger limits inference to $1/task, $5/day and $100/month. They protect requests routed through this API; they do not cap other GCP project spend or guarantee the provider's final bill.
 - AWS has a $75 monthly account budget and an automatic action to stop the Autobots EC2 instance at $70 actual spend. Budget updates are delayed, and this action does not stop other account resources or remove persistent storage/IP charges.
 
 ## Current model rates and sources

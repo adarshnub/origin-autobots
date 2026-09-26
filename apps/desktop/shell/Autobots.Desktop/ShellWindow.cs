@@ -436,6 +436,11 @@ public sealed class ShellWindow : Window
 
         // ---- Wiring ----------------------------------------------------------------------------
         _hud.StopRequested += (_, _) => StopEverything("HUD");
+        _hud.ResumeRequested += (_, _) =>
+        {
+            if (_runner?.ContinueAfterOwnerAction() == true)
+                SetStatus("Resuming the current task with a fresh screen observation…", Ui.AccentBrush);
+        };
         _hud.FinishListeningRequested += (_, _) => _voiceStop?.Cancel();
         _hud.CancelRequested += (_, _) => CancelVoice();
         _hud.StartNowRequested += async (_, _) => await StartPendingVoiceTaskAsync();
@@ -747,6 +752,12 @@ public sealed class ShellWindow : Window
     {
         if (_runner?.IsRunning != true)
             return;
+        if (progress.Phase == AgentPhase.WaitingForOwner)
+        {
+            _hud.ShowWaitingForOwner(progress.Detail, progress.Step, progress.MaxSteps);
+            SetStatus("Paused for your action. Use Resume only after handling the step yourself, or STOP.", Ui.WarningBrush);
+            return;
+        }
         var spinning = progress.Phase is AgentPhase.Starting or AgentPhase.Observing or AgentPhase.Thinking or AgentPhase.Settling;
         _hud.ShowWorking(progress.Title, progress.Detail, progress.Step, progress.MaxSteps, spinning);
         SetStatus($"Working · step {Math.Min(progress.Step, progress.MaxSteps)} of {progress.MaxSteps} · {progress.Title}", Ui.AccentBrush);

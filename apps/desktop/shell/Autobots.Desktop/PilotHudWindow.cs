@@ -167,6 +167,7 @@ public sealed class PilotHudWindow : Window
     }
 
     public event EventHandler? StopRequested;
+    public event EventHandler? ResumeRequested;
     public event EventHandler? FinishListeningRequested;
     public event EventHandler? CancelRequested;
     public event EventHandler? StartNowRequested;
@@ -186,6 +187,22 @@ public sealed class PilotHudWindow : Window
         _stepPill.IsVisible = true;
         _levelMeter.IsVisible = false;
         SetActions(("Stop", Icons.Stop, Ui.ButtonKind.Danger, () => StopRequested?.Invoke(this, EventArgs.Empty)));
+        Reveal();
+    }
+
+    public void ShowWaitingForOwner(string detail, int step, int maxSteps)
+    {
+        _autoHide.Stop();
+        SetTone(HudTone.Warning, Icons.Warning, spinning: false);
+        _title.Text = "Waiting for you";
+        _detail.Text = detail;
+        _detail.IsVisible = true;
+        _stepText.Text = $"Step {Math.Min(step, maxSteps)} of {maxSteps}";
+        _stepPill.IsVisible = true;
+        _levelMeter.IsVisible = false;
+        SetActions(
+            ("Resume", Icons.Play, Ui.ButtonKind.Accent, () => ResumeRequested?.Invoke(this, EventArgs.Empty)),
+            ("Stop", Icons.Stop, Ui.ButtonKind.Danger, () => StopRequested?.Invoke(this, EventArgs.Empty)));
         Reveal();
     }
 

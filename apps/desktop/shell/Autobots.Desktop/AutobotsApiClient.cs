@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Autobots.Contracts;
+using Autobots.Platform;
 
 namespace Autobots.Desktop;
 
@@ -14,7 +15,7 @@ public sealed class AutobotsApiException(int statusCode, string code, string? re
 }
 
 /// <summary>Optional API capabilities advertised by <c>/healthz</c>; older deployments advertise none.</summary>
-public sealed record ApiFeatures(string ApiVersion, bool Live, bool StepHistory, bool DesktopActionsV2, bool Transcription)
+public sealed record ApiFeatures(string ApiVersion, bool Live, bool StepHistory, bool DesktopActionsV2, bool Transcription, bool CalendarFieldObservation = false)
 {
     public static ApiFeatures Legacy { get; } = new("0.2", Live: true, StepHistory: false, DesktopActionsV2: false, Transcription: false);
 }
@@ -49,7 +50,8 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
             Live: root.TryGetProperty("mode", out var mode) && mode.GetString() == "live",
             StepHistory: features.Contains("step-history"),
             DesktopActionsV2: features.Contains("desktop-actions-v2"),
-            Transcription: features.Contains("transcription"));
+            Transcription: features.Contains("transcription"),
+            CalendarFieldObservation: features.Contains("calendar-field-observation"));
         return _features;
     }
 
@@ -90,6 +92,7 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
         byte[] image,
         IReadOnlyList<StepHistoryEntry> history,
         string? foregroundTitle,
+        CalendarEventFields? calendarFields,
         CancellationToken cancellationToken)
     {
         var features = await GetFeaturesAsync(cancellationToken).ConfigureAwait(false);
@@ -102,7 +105,10 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
             imageMimeType,
             Convert.ToBase64String(image),
             features.StepHistory ? history.TakeLast(15).ToArray() : null,
-            features.StepHistory && !string.IsNullOrWhiteSpace(foregroundTitle) ? Truncate(foregroundTitle, 300) : null);
+            features.StepHistory && !string.IsNullOrWhiteSpace(foregroundTitle) ? Truncate(foregroundTitle, 300) : null,
+            features.CalendarFieldObservation && calendarFields is not null
+                ? new CalendarFieldRequest(calendarFields.StartDate.Value, calendarFields.StartTime.Value, calendarFields.EndDate.Value, calendarFields.EndTime.Value)
+                : null);
         return await SendJsonAsync<ActionProposalResponse>(
             HttpMethod.Post,
             $"/v1/tasks/{taskId:D}/proposals",
@@ -212,7 +218,14 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
         [property: JsonPropertyName("image_mime_type")] string ImageMimeType,
         [property: JsonPropertyName("image_base64")] string ImageBase64,
         [property: JsonPropertyName("history")] StepHistoryEntry[]? History,
-        [property: JsonPropertyName("foreground_title")] string? ForegroundTitle);
+        [property: JsonPropertyName("foreground_title")] string? ForegroundTitle,
+        [property: JsonPropertyName("calendar_fields")] CalendarFieldRequest? CalendarFields);
+
+    private sealed record CalendarFieldRequest(
+        [property: JsonPropertyName("start_date")] string StartDate,
+        [property: JsonPropertyName("start_time")] string StartTime,
+        [property: JsonPropertyName("end_date")] string EndDate,
+        [property: JsonPropertyName("end_time")] string EndTime);
 
     public sealed record ActionProposalResponse(
         [property: JsonPropertyName("status")] string Status,

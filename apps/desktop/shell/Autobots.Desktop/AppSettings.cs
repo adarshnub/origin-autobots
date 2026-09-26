@@ -9,11 +9,11 @@ namespace Autobots.Desktop;
 public sealed record AppSettings
 {
     public const int MinSteps = 5;
-    public const int MaxSteps = 100;
+    public const int MaxSteps = 200;
     public const int MinMinutes = 1;
     public const int MaxMinutes = 30;
 
-    public int MaxStepsPerTask { get; init; } = 40;
+    public int MaxStepsPerTask { get; init; } = 100;
     public int MaxMinutesPerTask { get; init; } = 10;
     /// <summary>Pointer travel speed multiplier; 1 is the default pace.</summary>
     public double PointerSpeed { get; init; } = 1.0;
