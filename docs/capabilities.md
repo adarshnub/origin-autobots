@@ -1,5 +1,13 @@
 # Capability and toolchain findings
 
+## Live qualification and usage — 26 September 2026
+
+Explicit owner authorization enabled bounded live QA through the product UI on disposable files. Cognito browser sign-in, real model proposals, primary-display capture, native input, pointer diagnostics, the pilot STOP button and the private usage screen were exercised. See [test evidence](testing-2026-09-26.md); earlier skipped-live statements below describe previous passes.
+
+Pointer calibration measured zero physical-pixel error at all 11 recorded destinations on the tested display. The failing Notepad run instead showed unreliable character selection and repeated correction attempts. Added precise editing guidance and an arrival guard; mixed-DPI/multi-monitor live behavior remains untested. Ctrl+Shift+S was intercepted by a desktop capture utility; File-menu fallback was observed in the later run.
+
+Existing AWS CLI, Terraform, .NET, Python, Node and packages sufficed. API 0.4.0 records Gemini desktop/speech usage and exposes owner-only summaries. Runtime IAM can read only the existing AWS account budget. Live AWS data loaded with its billing timestamp. BigQuery dataset discovery failed because the approved GCP project's BigQuery API is disabled, so invoice export is not connected. No other billable AI API provider is configured. Estimates are distinct from invoices, and failed billing retrieval is displayed as unavailable.
+
 ## Custom website hostname — 26 September 2026
 
 The owner's existing GoDaddy session exposed the editable DNS zone for `origin-studio.in`. Added only the Autobots CNAME and ACM validation CNAME; the main website's root `A` record, `www` and nameservers remain intact. The existing AWS CLI identity and installed Terraform/provider were sufficient; no dependency installation, registrar API credentials or new AWS keys were needed. ACM in `us-east-1` reported the non-exportable certificate `ISSUED`, and CloudFront `E21MANSPJEWFLG` reported `Deployed` with alias `autobots.origin-studio.in`. The authoritative GoDaddy DNS server returned the expected CloudFront CNAME with TTL 3600. The public address is `https://autobots.origin-studio.in`. No application, HTTP or rendered-page tests were run, and global DNS propagation is not claimed. See [implementation evidence](implementation-status.md) and [domain configuration guide](../infra/aws/website/README.md).

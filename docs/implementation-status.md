@@ -2,6 +2,16 @@
 
 Updated 26 September 2026.
 
+## 26 September 2026 — live QA, text editing and usage reporting
+
+- Owner-authorized native runs use disposable files and the normal product task grant/lease. Full results, failures, commands, metrics and skipped checks: [live qualification log](testing-2026-09-26.md). Earlier no-live-test entries below are historical.
+- Added opt-in local action diagnostics, measured pointer arrival before clicks, precise text-edit guidance and a File-menu fallback for intercepted shortcuts. Fixed local/server epoch confusion, composer Alt+Tab interference, repeated hotkey registration and `Super_L` key parsing. STOP and focus/lease validation remain enforced.
+- Added the private desktop **Usage & costs** window and authenticated API 0.4.0 `/v1/usage`: model requests/tokens/estimated costs, failures, daily/monthly limits, separate speech accounting and existing AWS budget billing with timestamp. GCP invoices are unavailable because the project's BigQuery API/export is not enabled; this is labeled, not shown as zero.
+- Regression evidence: 68 Python tests and 68 .NET tests passed; Windows bundle built. Nine-target live calibration passed with zero measured pixel error, 14 actions, 70.11 s. Button STOP observed in 48.77 ms with no subsequent executed actions. Longer editing results are recorded individually in the log.
+- Cloud changes: API source artifact uploaded and deployed through SSM with live health success; one reviewed narrow IAM policy reads the existing budget; deployment supplies only account/budget identifiers. No resource replacement, budget increase, new dependency or public desktop release.
+- Website adds three interactive workflow examples, including create/join Meet and invite Amal on WhatsApp. That communication workflow remains explicitly untested.
+- Next: finish the current exact-content live run and website browser checks, then qualify voice and an explicitly scoped meeting workflow. GCP invoice integration needs an existing billing export or a separately scoped export setup.
+
 ## 26 September 2026 — custom website domain
 
 - **Components:** Added optional custom-hostname support to the isolated website Terraform root, an account-restricted `us-east-1` AWS provider for ACM, a DNS-validated non-exportable RSA certificate, certificate validation, CloudFront alias/SNI TLS configuration and public DNS outputs. Public website URL: `https://autobots.origin-studio.in`; the existing CloudFront address remains available. Updated the infrastructure guide and master plan.

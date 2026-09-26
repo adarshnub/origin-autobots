@@ -129,6 +129,7 @@ public sealed class AgentTaskRunner(
             }
 
             var history = new List<StepHistoryEntry>();
+            var repeatedClicks = new RepeatedClickGuard();
             var consecutiveRejections = 0;
             var settle = (Minimum: TimeSpan.FromMilliseconds(450), Maximum: TimeSpan.FromMilliseconds(1500));
             for (long sequence = 1; ; sequence++)
@@ -197,6 +198,17 @@ public sealed class AgentTaskRunner(
                     throw new InvalidOperationException("The service returned an unsupported task step.");
 
                 var action = result.Proposal.Action;
+                if (!repeatedClicks.CanExecute(action, frame.ImageBytes, frame.ForegroundProcessId))
+                {
+                    const string reason = "This same click was already executed twice on an identical screen without visible progress. No click sent. Switch to the real target app or use a different approach; do not click controls inside a screenshot.";
+                    runLog.Write("rejected", new { sequence, stage = "progress-check", reason });
+                    if (++consecutiveRejections > MaxConsecutiveRejections)
+                        return Finish(AgentOutcome.NeedsInput, "Repeated clicks are not making visible progress. Check the active app before starting again.");
+                    history.Add(new StepHistoryEntry(sequence, ActionNarration.ForHistory(action, result.Intent), "rejected", reason));
+                    Emit(executed + 1, Icons.Shield, "No visible progress", reason, TimelineTone.Warning);
+                    settle = (TimeSpan.Zero, TimeSpan.FromMilliseconds(300));
+                    continue;
+                }
                 stage = "authorizing";
                 if (!supervisor.TryAuthorizeTaskAction(lease, result.Proposal, frame, DateTimeOffset.UtcNow, out var authorization, out var rejection) || authorization is null)
                 {
@@ -231,6 +243,7 @@ public sealed class AgentTaskRunner(
                 }
 
                 executed++;
+                repeatedClicks.RecordExecuted(action, frame.ImageBytes, frame.ForegroundProcessId);
                 runLog.Write("executed", new { sequence, step = executed, action = action.GetType().Name });
                 consecutiveRejections = 0;
                 history.Add(new StepHistoryEntry(sequence, ActionNarration.ForHistory(action, result.Intent), "executed", null));

@@ -21,13 +21,16 @@ public sealed record KeyChord(KeyModifiers Modifiers, string Key)
     {
         ["ctrl"] = KeyModifiers.Control, ["control"] = KeyModifiers.Control, ["ctl"] = KeyModifiers.Control,
         ["lctrl"] = KeyModifiers.Control, ["rctrl"] = KeyModifiers.Control, ["controlleft"] = KeyModifiers.Control,
+        ["controll"] = KeyModifiers.Control, ["controlr"] = KeyModifiers.Control,
         ["controlright"] = KeyModifiers.Control, ["leftcontrol"] = KeyModifiers.Control, ["rightcontrol"] = KeyModifiers.Control,
         // Autobots drives Windows first: a macOS Command shortcut means the equivalent Control shortcut.
         ["cmd"] = KeyModifiers.Control, ["command"] = KeyModifiers.Control,
         ["shift"] = KeyModifiers.Shift, ["lshift"] = KeyModifiers.Shift, ["rshift"] = KeyModifiers.Shift,
         ["shiftleft"] = KeyModifiers.Shift, ["shiftright"] = KeyModifiers.Shift,
+        ["shiftl"] = KeyModifiers.Shift, ["shiftr"] = KeyModifiers.Shift,
         ["alt"] = KeyModifiers.Alt, ["option"] = KeyModifiers.Alt, ["opt"] = KeyModifiers.Alt, ["lalt"] = KeyModifiers.Alt,
         ["ralt"] = KeyModifiers.Alt, ["altleft"] = KeyModifiers.Alt, ["altright"] = KeyModifiers.Alt,
+        ["altl"] = KeyModifiers.Alt, ["altr"] = KeyModifiers.Alt,
         ["meta"] = KeyModifiers.Meta, ["win"] = KeyModifiers.Meta, ["windows"] = KeyModifiers.Meta, ["super"] = KeyModifiers.Meta,
         ["superl"] = KeyModifiers.Meta, ["superr"] = KeyModifiers.Meta,
         ["os"] = KeyModifiers.Meta, ["lwin"] = KeyModifiers.Meta, ["rwin"] = KeyModifiers.Meta, ["metaleft"] = KeyModifiers.Meta,
