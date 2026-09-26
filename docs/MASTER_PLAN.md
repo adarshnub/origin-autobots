@@ -12,13 +12,13 @@ The original plan remains in `archive/MASTER_PLAN.initial.md`. This specificatio
 
 Autobots accepts an owner instruction that grants a bounded task, observes the current desktop, proposes one action at a time, validates each action locally, performs it visibly, then checks the result. It ends completed, needs input, blocked, stopped, failed, paused or out of budget. The active task always has a local STOP path independent of cloud availability.
 
-The first product slice is a typed instruction and an authenticated screenshot-to-action loop on Windows. Submitting an instruction in the local app is the owner's task-scoped grant: the local Windows pilot executes one validated action at a time without a separate confirmation at each step, then observes again. The task is limited to the stated request, visible foreground app, five minutes and 20 actions; the local owner can STOP it at any time. Push-to-talk, structured browser and VS Code adapters, dashboard operations, and workflow packs follow as separate milestones. The app must keep mock mode useful while credentials are absent.
+The first product slice is a typed or spoken instruction and an authenticated screenshot-to-action loop on Windows. Submitting an instruction in the local app is the owner's task-scoped grant: the local Windows pilot executes one validated action at a time without a separate confirmation at each step, then observes again. A task may use any normal-integrity application on the interactive desktop (Start menu, taskbar, browsers, VS Code and other installed apps); each action is bound to the window that was active in its own screenshot. The task is limited to the stated request and to owner-configured step and time limits (default 40 actions and 10 minutes, bounded to 5–100 actions and 1–30 minutes); the local owner can STOP it at any time. A spoken instruction is captured only while the owner holds the push-to-talk session open, is transcribed by Gemini, and is shown with a short countdown (cancel or edit) before it becomes the task. Structured browser and VS Code adapters, dashboard operations, and workflow packs follow as separate milestones. The app must keep mock mode useful while credentials are absent.
 
 ### Identity and scope
 
 - Display name: **Autobots by Origin Studios**.
 - Keep internal namespaces consistent with `Autobots` / `autobots`.
-- The landing-page application is a separate website project with one blank page reserved for future content. It contains no present marketing copy, signup, analytics or downloads.
+- The landing-page application is a separate public website project. Its product showcase, illustrated walkthrough, developer profile and platform roadmap were commissioned after the initial blank placeholder. It has no public signup or analytics. The owner-only, unsigned Windows pilot is not a public download.
 - Keep the original handoff intact under `docs/archive/`.
 
 ## Architecture
@@ -54,7 +54,7 @@ Implement and qualify Windows native services first. macOS and Linux projects ar
 - `packages/contracts`: source JSON Schema, generated language types and shared fixtures.
 - `adapters`: permissioned browser and VS Code extensions.
 - `apps/dashboard`: authenticated owner/admin console.
-- `apps/website`: intentionally blank future public website.
+- `apps/website`: independent public landing page and developer page.
 - `infra`: separate AWS/GCP Terraform and isolated environments.
 - `evals`: synthetic desktop tasks, quality comparisons and adversarial fixtures.
 
@@ -65,15 +65,15 @@ Google Cloud is the first provider behind a replaceable `ModelProvider` interfac
 ### Initial routing policy
 
 1. Prefer deterministic local postcondition checks and structured adapter observations where available.
-2. Use `gemini-3.5-flash-lite` for routine screenshot interpretation and action proposals, subject to the capability probe.
-3. The current pilot makes one Flash-Lite proposal call per user submission. Do not automatically retry or route to a stronger model; report a blocked or unavailable proposal for owner review.
+2. Use `gemini-3.5-flash-lite` for routine screenshot interpretation and action proposals, subject to the capability probe. The desktop computer-use tool runs with `LOW` thinking, excludes predefined functions the executor does not implement (`key_down`, `key_up`, `mouse_down`, `mouse_up`, `take_screenshot`), and receives a bounded history of the steps the device executed or rejected. History entries are untrusted data, never authorization.
+3. The current pilot makes one Flash-Lite proposal call per observation. A proposal the local supervisor or executor rejects before any input is sent is recorded in the history and the task re-observes (at most three consecutive rejections). Do not automatically retry a request or route to a stronger model; stop and report uncertain or unavailable results for owner review.
 4. Defer stronger models and Pro models until a later capability and cost comparison justifies them.
 5. Do not add a separate image-description call before each action. A visual turn should propose the next bounded action directly.
 6. Compare cost per successfully completed task against a Flash baseline before broadening the routed default.
 
 ### Budget controls
 
-The deployed pilot ledger limits inference to **$0.25 per task, $0.50 per UTC day and $20 per UTC calendar month**. These are API-side request controls, not Google Cloud billing guarantees. Reserve estimated request cost before dispatch, reconcile provider-reported usage, account for in-flight requests after crashes, and block a call that would exceed a limit. Do not let the model or remote dashboard silently raise a limit.
+The deployed pilot ledger limits inference to **$0.25 per task, $0.50 per UTC day and $20 per UTC calendar month**. Voice transcription uses a separate ledger with defaults of **$0.01 per request, $0.10 per UTC day and $2 per UTC month**. These are API-side request controls, not Google Cloud billing guarantees. Reserve estimated request cost before dispatch, reconcile provider-reported usage, account for in-flight requests after crashes, and block a call that would exceed a limit. Do not let the model or remote dashboard silently raise a limit.
 
 Record provider, model, service tier, input/output/cache usage, estimated cost, route reason, latency, retry count and validation result. Keep hosting, speech, storage and egress accounting separate. Pricing changes over time; store rates with effective dates and refresh them before enabling live traffic.
 
@@ -93,7 +93,7 @@ Record provider, model, service tier, input/output/cache usage, estimated cost, 
 - Exactly one task owns the physical input lease.
 - Local supervisor validates task/device ownership, lease, epoch, sequence, observation freshness, schema and task grant before execution. Each action receives a one-use, short-lived local capability; the model and API cannot mint one.
 - STOP immediately revokes the local lease, advances epoch, cancels pending dispatch, releases held inputs and rejects late results. Cloud acknowledgement is not required.
-- Native input is disarmed until the owner submits a task in the local UI. The one-use authorization is then created by the supervisor for each current proposal, expires quickly and binds to the task, action, screenshot, target window and display generation.
+- Native input is disarmed until the owner submits a task in the local UI (typed, or a displayed voice transcript the owner lets start). The one-use authorization is then created by the supervisor for each current proposal, expires within 15 seconds and binds to the task, action, screenshot, the window active in that screenshot and display generation. The executor re-checks focus, layout and cancellation during paced pointer motion and typing.
 - Text input fails closed for password controls and for focused controls that Windows UI Automation cannot verify as ordinary editable text controls.
 - The initial Windows adapter works at the signed-in user's normal integrity. It does not control UAC/secure-desktop surfaces or higher-integrity processes.
 - App startup and test harness start disarmed. Unit tests never control the developer desktop.
@@ -110,9 +110,9 @@ Record provider, model, service tier, input/output/cache usage, estimated cost, 
 
 `packages/contracts/schemas/action-envelope.schema.json` is the source of truth. It carries schema version, task/device/action/observation IDs, lease ID, epoch, monotonic sequence and one typed action. The provider adapter normalizes provider-specific coordinates; OS-specific handles do not cross the platform boundary.
 
-Minimum actions: click, type text, key press, scroll and bounded wait. Each proposal binds to the screenshot/observation from which it was produced. Action results distinguish executed, rejected, unknown and cancelled. Task grants bind the owner's submitted instruction to a device, lease, expiry and bounded action budget.
+Minimum actions: click (one to three clicks, any button), type text (optionally followed by Enter), key press (including the Windows key and chords), scroll, pointer move, drag and bounded wait. Each proposal binds to the screenshot/observation from which it was produced. Action results distinguish executed, rejected (nothing sent), interrupted/unknown (some input sent) and cancelled. Task grants bind the owner's submitted instruction to a device, lease, expiry and bounded action budget.
 
-The current API exposes public health plus Cognito-protected device enrollment, task create/read/stop and action-proposal routes. It verifies Cognito access-token issuer, client ID, expiry and `autobots-owners` group. The API never executes input: it returns one action proposal, a completion report, or a request for missing details per observation; the local Windows supervisor owns validation and dispatch. Revocation, remote approval records, config, releases and admin routes remain future work.
+The current API exposes public health (with an advertised feature list) plus Cognito-protected device enrollment, task create/read/stop, action-proposal and voice-transcription routes. It verifies Cognito access-token issuer, client ID, expiry and `autobots-owners` group. The API never executes input: it returns one action proposal (with the model's short stated intent for display), a completion report, or a request for missing details per observation; the local Windows supervisor owns validation and dispatch. Transcription accepts one bounded push-to-talk WAV clip (at most 60 seconds), is budgeted in a separate ledger, never stores audio and cannot create or start a task. Revocation, remote approval records, config, releases and admin routes remain future work.
 
 ## Infrastructure
 
@@ -122,9 +122,9 @@ Terraform must isolate `dev` from `prod`, verify expected account/project IDs, e
 
 ## UI and future website
 
-The current Windows shell supports Cognito sign-in, typed task entry, task-granted repeated display capture, an autonomous bounded observe/propose/validate/act loop, local lease/focus/layout validation, native input at normal user integrity, and a STOP button plus global hotkey. It executes without per-action approval and stops to request missing task details or on provider/security handoff. Each task stops after 20 actions or five minutes. The first adapter uses visual screen interaction for the currently visible app, including browsers; the intended Google Calendar workflows create/schedule events and join existing Google Meet calls through a browser already signed into the intended account. Meeting joins default to microphone and camera off and do not record. There is no browser extension or direct Calendar API connector, so web workflows depend on the active browser session, and this path has not been tested end to end. Literal support for every installed app is not promised: UAC/secure desktop, elevated processes and applications that block or do not expose usable input remain outside scope. Global STOP overlay, cursor halo, push-to-talk, browser/VS Code structured adapters and native macOS/Linux implementations remain future work behind the platform boundary.
+The current Windows shell supports Cognito sign-in, typed and spoken task entry, task-granted repeated display capture, an autonomous bounded observe/propose/validate/act loop, local lease/focus/layout validation, native input at normal user integrity, and STOP through a button, the floating pilot bar, the tray menu and a global hotkey. It executes without per-action approval and stops to request missing task details or on provider/security handoff. The main window is a dark Windows 11 design with a composer, suggestions, a live activity feed and a settings sheet (step/time limits, pointer speed, voice and tray options). While a task runs the main window minimizes and a non-activating, always-on-top pilot bar shows the current step, the model's stated intent and STOP. The real Windows pointer travels visibly to each target along an eased path and a click-through indicator (halo, click ripple, caption) follows it. The pilot bar and pointer indicator are hidden for the instant of each Autobots screenshot and move away from pointer targets; they are never capture-excluded from other software. Push-to-talk uses `Ctrl+Alt+Space` or the mic button, records the default microphone only until the owner finishes or pauses (at most 45 seconds), and shows a live level meter. Closing the window keeps Autobots in the tray so the hotkey remains available. The adapter uses visual screen interaction across apps, including browsers; the intended Google Calendar workflows create/schedule events and join existing Google Meet calls through a browser already signed into the intended account. Meeting joins default to microphone and camera off and do not record. There is no browser extension or direct Calendar API connector, so web workflows depend on the active browser session, and this path has not been tested end to end. Literal support for every installed app is not promised: UAC/secure desktop, the lock screen, processes running as administrator and applications that block or do not expose usable input remain outside scope and are reported as a handoff. Pausing on physical owner input, multi-monitor observation, browser/VS Code structured adapters and native macOS/Linux implementations remain future work behind the platform boundary.
 
-`apps/website` remains visually blank at `/`, with document title “Autobots by Origin Studios”. It is an independently buildable project. Do not add marketing, links or analytics until a later explicit website task.
+`apps/website` is an independently buildable landing page with a continuous scroll-responsive 3D scene, a clearly marked illustrative demo, a Windows private-pilot access point, macOS/Linux roadmap cards and a separate developer page. Public signup and analytics remain disabled. A direct Windows download requires a separately approved public release artifact and configured URL.
 
 ## Milestones
 

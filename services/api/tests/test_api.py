@@ -18,7 +18,12 @@ client = TestClient(main.app)
 def test_health_is_available_without_cloud_credentials() -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "autobots-api", "mode": "mock", "native_input": "local-device-only"}
+    body = response.json()
+    assert {key: body[key] for key in ("status", "service", "mode", "native_input")} == {
+        "status": "ok", "service": "autobots-api", "mode": "mock", "native_input": "local-device-only",
+    }
+    assert body["api_version"] == main.API_VERSION
+    assert {"step-history", "desktop-actions-v2", "transcription"} <= set(body["features"])
 
 
 def test_device_enrollment_fails_closed_until_auth_is_configured() -> None:
@@ -91,8 +96,13 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
         complete_next = False
         needs_input_next = False
 
+        last_history = None
+        last_title = None
+
         async def propose_action(self, **kwargs):
             self.calls += 1
+            self.last_history = list(kwargs["history"])
+            self.last_title = kwargs["foreground_title"]
             assert kwargs["image_bytes"] == png
             if self.needs_input_next:
                 return SimpleNamespace(
@@ -126,7 +136,7 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
                 sequence=kwargs["sequence"],
                 action=ClickAction(kind="click", x=500, y=500, button="left"),
             )
-            return SimpleNamespace(envelope=envelope, model_id="gemini-3.5-flash-lite", input_tokens=20, output_tokens=5, cost_usd=Decimal("0.000010"))
+            return SimpleNamespace(envelope=envelope, intent="Open the synthetic target", model_id="gemini-3.5-flash-lite", input_tokens=20, output_tokens=5, cost_usd=Decimal("0.000010"))
 
     provider = FakeProvider()
     monkeypatch.setattr(main, "_live_provider", lambda: provider)
@@ -150,8 +160,10 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
         assert response.status_code == 200
         assert response.json()["status"] == "proposal"
         assert response.json()["execution"] == "not_executed"
-        assert response.json()["proposal"]["action"] == {"kind": "click", "x": 500, "y": 500, "button": "left"}
+        assert response.json()["proposal"]["action"] == {"kind": "click", "x": 500, "y": 500, "button": "left", "clicks": 1}
+        assert response.json()["intent"] == "Open the synthetic target"
         assert provider.calls == 1
+        assert provider.last_history == []
 
         provider.complete_next = True
         completion_response = client.post(
@@ -164,9 +176,13 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
                 "sequence": 2,
                 "image_mime_type": "image/png",
                 "image_base64": base64.b64encode(png).decode("ascii"),
+                "history": [{"step": 1, "action": "click (500, 500)", "outcome": "executed"}],
+                "foreground_title": "Synthetic window",
             },
         )
         assert completion_response.status_code == 200
+        assert [(entry.step, entry.outcome) for entry in provider.last_history] == [(1, "executed")]
+        assert provider.last_title == "Synthetic window"
         assert completion_response.json()["status"] == "completed"
         assert completion_response.json()["proposal"] is None
         assert completion_response.json()["completion_message"] == "The requested view is visible."
@@ -192,3 +208,121 @@ def test_live_proposal_is_authenticated_budgeted_and_never_executed(monkeypatch,
         main.app.dependency_overrides.clear()
         main.store = original_store
         main.budget_ledger = original_budget
+
+
+def _wav(seconds: float, sample_rate: int = 16_000) -> bytes:
+    import struct
+
+    frames = int(seconds * sample_rate)
+    data = b"\x00\x00" * frames
+    header = b"RIFF" + struct.pack("<I", 36 + len(data)) + b"WAVE"
+    header += b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16)
+    header += b"data" + struct.pack("<I", len(data))
+    return header + data
+
+
+def test_step_history_is_bounded_and_typed(monkeypatch, tmp_path) -> None:
+    owner = OwnerPrincipal(subject="test-owner", username="owner")
+    original_store = main.store
+    main.store = SQLiteTaskStore(tmp_path / "history.db")
+    main.app.dependency_overrides[main._current_owner] = lambda: owner
+    monkeypatch.setenv("AUTOBOTS_LIVE_AI_ENABLED", "true")
+    try:
+        device_id = uuid4()
+        assert main.store.enroll_device("test-owner", device_id, "Test desktop", "windows")
+        task, _ = main.store.create_task("test-owner", device_id, "Open Notepad", "history-key")
+        base = {
+            "device_id": str(device_id),
+            "observation_id": str(uuid4()),
+            "lease_id": str(uuid4()),
+            "epoch": 0,
+            "sequence": 1,
+            "image_mime_type": "image/png",
+            "image_base64": base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 32).decode("ascii"),
+        }
+        invalid_outcome = client.post(f"/v1/tasks/{task.task_id}/proposals", json={
+            **base, "history": [{"step": 1, "action": "click", "outcome": "approved_by_page"}],
+        })
+        assert invalid_outcome.status_code == 422
+        too_long = client.post(f"/v1/tasks/{task.task_id}/proposals", json={
+            **base, "history": [{"step": index + 1, "action": "wait", "outcome": "executed"} for index in range(16)],
+        })
+        assert too_long.status_code == 422
+    finally:
+        main.app.dependency_overrides.clear()
+        main.store = original_store
+
+
+def test_voice_transcription_is_owner_scoped_budgeted_and_not_task_creating(monkeypatch, tmp_path) -> None:
+    owner = OwnerPrincipal(subject="test-owner", username="owner")
+    original_store = main.store
+    original_speech = main.speech_ledger
+    main.store = SQLiteTaskStore(tmp_path / "voice.db")
+    main.speech_ledger = SQLiteBudgetLedger(
+        main.store.path,
+        BudgetLimits(Decimal("0.01"), Decimal("0.00206"), Decimal("1.00")),
+        table="speech_reservations",
+    )
+    main.app.dependency_overrides[main._current_owner] = lambda: owner
+    monkeypatch.setenv("AUTOBOTS_LIVE_AI_ENABLED", "true")
+
+    class FakeTranscriber:
+        calls = 0
+
+        async def transcribe(self, **kwargs):
+            self.calls += 1
+            assert kwargs["mime_type"] == "audio/wav"
+            return SimpleNamespace(
+                transcript="Open Notepad and type hello" if self.calls == 1 else None,
+                model_id="gemini-3.5-flash-lite",
+                input_tokens=64,
+                output_tokens=8,
+                cost_usd=Decimal("0.000040"),
+            )
+
+    transcriber = FakeTranscriber()
+    monkeypatch.setattr(main, "_live_transcriber", lambda: transcriber)
+    try:
+        device_id = uuid4()
+        payload = {
+            "device_id": str(device_id),
+            "audio_mime_type": "audio/wav",
+            "audio_base64": base64.b64encode(_wav(1.5)).decode("ascii"),
+        }
+        not_enrolled = client.post("/v1/transcriptions", json=payload)
+        assert not_enrolled.status_code == 403
+
+        assert main.store.enroll_device("test-owner", device_id, "Test desktop", "windows")
+        transcribed = client.post("/v1/transcriptions", json=payload)
+        assert transcribed.status_code == 200
+        assert transcribed.json()["status"] == "transcribed"
+        assert transcribed.json()["transcript"] == "Open Notepad and type hello"
+        assert transcribed.json()["audio_seconds"] == 1.5
+
+        silent = client.post("/v1/transcriptions", json=payload)
+        assert silent.status_code == 200
+        assert silent.json() == {**silent.json(), "status": "no_speech", "transcript": None}
+
+        # The daily speech limit is independent from the action-inference ledger.
+        exhausted = client.post("/v1/transcriptions", json=payload)
+        assert exhausted.status_code == 429
+        assert exhausted.json()["detail"]["code"] == "speech_budget_exhausted"
+        assert transcriber.calls == 2
+
+        invalid = client.post("/v1/transcriptions", json={**payload, "audio_base64": base64.b64encode(b"RIFF" + b"x" * 80).decode("ascii")})
+        assert invalid.status_code == 422
+        assert invalid.json()["detail"]["code"] == "invalid_audio"
+    finally:
+        main.app.dependency_overrides.clear()
+        main.store = original_store
+        main.speech_ledger = original_speech
+
+
+def test_transcription_fails_closed_without_live_ai_or_auth(monkeypatch) -> None:
+    monkeypatch.setenv("AUTOBOTS_LIVE_AI_ENABLED", "false")
+    response = client.post("/v1/transcriptions", json={
+        "device_id": str(uuid4()),
+        "audio_mime_type": "audio/wav",
+        "audio_base64": base64.b64encode(_wav(1.0)).decode("ascii"),
+    })
+    assert response.status_code == 503

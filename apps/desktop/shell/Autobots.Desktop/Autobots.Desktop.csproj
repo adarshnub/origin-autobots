@@ -7,6 +7,7 @@
     <RootNamespace>Autobots.Desktop</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest Condition="'$(OS)' == 'Windows_NT'">app.manifest</ApplicationManifest>
+    <ApplicationIcon Condition="'$(OS)' == 'Windows_NT'">Assets\AutobotsIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />
@@ -14,6 +15,8 @@
     <PackageReference Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets\AutobotsIcon.ico" />
+    <EmbeddedResource Include="Assets\AutobotsIcon.png" />
     <ProjectReference Include="../../core/Autobots.Core/Autobots.Core.csproj" />
     <ProjectReference Include="../../../../platforms/abstractions/Autobots.Platform.Abstractions/Autobots.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../../../platforms/windows/Autobots.Platform.Windows/Autobots.Platform.Windows.csproj" Condition="'$(OS)' == 'Windows_NT'" />

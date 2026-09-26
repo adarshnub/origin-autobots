@@ -17,5 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="../../../../packages/contracts/fixtures/action-click.v1.json" Link="action-click.v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../../packages/contracts/fixtures/action-drag.v1.json" Link="action-drag.v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../../packages/contracts/fixtures/action-type-enter.v1.json" Link="action-type-enter.v1.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

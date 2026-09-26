@@ -6,7 +6,7 @@ import os
 from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,14 +18,20 @@ from services.api.app.google_provider import (
     GoogleCloudModelProvider,
     OwnerConfirmationRequired,
     ProposalUnavailable,
+    StepRecord,
 )
 from services.api.app.persistent_budget import SQLiteBudgetLedger
+from services.api.app.speech import GeminiTranscriber, InvalidAudio, inspect_wave
 from services.api.app.storage import IdempotencyConflict, SQLiteTaskStore, StoredTask
 
 
+API_VERSION = "0.3.0"
+# Advertised so the desktop client can detect an older deployed API and omit newer request fields.
+API_FEATURES = ("step-history", "desktop-actions-v2", "transcription")
+
 app = FastAPI(
     title="Autobots by Origin Studios API",
-    version="0.2.0",
+    version=API_VERSION,
     description="Owner-only control plane. The local supervisor remains authoritative for all desktop input.",
 )
 
@@ -59,6 +65,15 @@ class TaskResponse(StrictModel):
     updated_at: str
 
 
+class StepHistoryEntry(StrictModel):
+    """A step already handled by the enrolled device, reported as untrusted context for the model."""
+
+    step: int = Field(ge=1, le=1000)
+    action: str = Field(min_length=1, max_length=300)
+    outcome: Literal["executed", "rejected", "failed"]
+    detail: str | None = Field(default=None, max_length=300)
+
+
 class ActionProposalRequest(StrictModel):
     device_id: UUID
     observation_id: UUID
@@ -67,17 +82,37 @@ class ActionProposalRequest(StrictModel):
     sequence: int = Field(ge=1)
     image_mime_type: Literal["image/png", "image/jpeg"]
     image_base64: str = Field(min_length=16, max_length=4_000_000)
+    history: list[StepHistoryEntry] = Field(default_factory=list, max_length=15)
+    foreground_title: str | None = Field(default=None, max_length=300)
 
 
 class ActionProposalResponse(StrictModel):
     status: Literal["proposal", "completed", "needs_input"]
     proposal: ActionEnvelope | None
     completion_message: str | None = None
+    intent: str | None = None
     model_id: str
     input_tokens: int
     output_tokens: int
     actual_cost_usd: str
     execution: Literal["not_executed"] = "not_executed"
+
+
+class TranscriptionRequest(StrictModel):
+    device_id: UUID
+    audio_mime_type: Literal["audio/wav"]
+    audio_base64: str = Field(min_length=64, max_length=3_000_000)
+    language_hint: str | None = Field(default=None, max_length=40, pattern=r"^[A-Za-z][A-Za-z ,()-]*$")
+
+
+class TranscriptionResponse(StrictModel):
+    status: Literal["transcribed", "no_speech"]
+    transcript: str | None
+    audio_seconds: float
+    model_id: str
+    input_tokens: int
+    output_tokens: int
+    actual_cost_usd: str
 
 
 def _budget_limits() -> BudgetLimits:
@@ -88,8 +123,18 @@ def _budget_limits() -> BudgetLimits:
     )
 
 
+def _speech_budget_limits() -> BudgetLimits:
+    return BudgetLimits(
+        per_task_usd=Decimal(os.getenv("AUTOBOTS_MAX_SPEECH_COST_USD_PER_REQUEST", "0.01")),
+        per_day_usd=Decimal(os.getenv("AUTOBOTS_MAX_SPEECH_COST_USD_PER_DAY", "0.10")),
+        per_month_usd=Decimal(os.getenv("AUTOBOTS_MAX_SPEECH_COST_USD_PER_MONTH", "2.00")),
+    )
+
+
 store = SQLiteTaskStore()
 budget_ledger = SQLiteBudgetLedger(store.path, _budget_limits())
+speech_ledger = SQLiteBudgetLedger(store.path, _speech_budget_limits(), table="speech_reservations")
+_SPEECH_RESERVATION_USD = Decimal("0.002")
 
 
 def _current_owner(authorization: Annotated[str | None, Header()] = None) -> OwnerPrincipal:
@@ -105,17 +150,35 @@ def _live_provider() -> GoogleCloudModelProvider:
         project=project,
         location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"),
         model_id=os.getenv("AUTOBOTS_MODEL_ID", "gemini-3.5-flash-lite"),
+        thinking_level=os.getenv("AUTOBOTS_MODEL_THINKING_LEVEL", "LOW"),
     )
 
 
+@lru_cache(maxsize=1)
+def _live_transcriber() -> GeminiTranscriber:
+    project = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+    if not project:
+        raise HTTPException(status_code=503, detail={"code": "model_project_not_configured"})
+    return GeminiTranscriber(
+        project=project,
+        location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"),
+        model_id=os.getenv("AUTOBOTS_TRANSCRIPTION_MODEL_ID", os.getenv("AUTOBOTS_MODEL_ID", "gemini-3.5-flash-lite")),
+    )
+
+
+def _live_ai_enabled() -> bool:
+    return os.getenv("AUTOBOTS_LIVE_AI_ENABLED", "false").lower() == "true"
+
+
 @app.get("/healthz", tags=["health"])
-async def health() -> dict[str, str]:
-    live = os.getenv("AUTOBOTS_LIVE_AI_ENABLED", "false").lower() == "true"
+async def health() -> dict[str, object]:
     return {
         "status": "ok",
         "service": "autobots-api",
-        "mode": "live" if live else "mock",
+        "mode": "live" if _live_ai_enabled() else "mock",
         "native_input": "local-device-only",
+        "api_version": API_VERSION,
+        "features": list(API_FEATURES),
     }
 
 
@@ -175,7 +238,7 @@ async def propose_action(
     request: ActionProposalRequest,
     principal: Annotated[OwnerPrincipal, Depends(_current_owner)],
 ) -> ActionProposalResponse:
-    if os.getenv("AUTOBOTS_LIVE_AI_ENABLED", "false").lower() != "true":
+    if not _live_ai_enabled():
         raise HTTPException(status_code=503, detail={"code": "live_inference_disabled"})
     task = store.get_task(principal.subject, task_id)
     if task is None:
@@ -209,6 +272,8 @@ async def propose_action(
             sequence=request.sequence,
             image_bytes=image,
             image_mime_type=request.image_mime_type,
+            history=[StepRecord(entry.step, entry.action, entry.outcome, entry.detail) for entry in request.history],
+            foreground_title=request.foreground_title,
         )
     except OwnerConfirmationRequired as error:
         if reservation:
@@ -219,7 +284,7 @@ async def propose_action(
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         store.record_event(principal.subject, task_id, "proposal_rejected", {"epoch": request.epoch, "sequence": request.sequence})
-        raise HTTPException(status_code=422, detail={"code": "proposal_unavailable"}) from error
+        raise HTTPException(status_code=422, detail={"code": "proposal_unavailable", "reason": _safe_reason(error)}) from error
     except HTTPException:
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
@@ -265,6 +330,7 @@ async def propose_action(
             {
                 "model": result.model_id,
                 "action_id": str(result.envelope.action_id),
+                "action_kind": result.envelope.action.kind,
                 "observation_id": str(request.observation_id),
                 "epoch": request.epoch,
                 "sequence": request.sequence,
@@ -277,11 +343,66 @@ async def propose_action(
         status="needs_input" if needs_input else "completed" if completed else "proposal",
         proposal=result.envelope,
         completion_message=getattr(result, "completion_message", None),
+        intent=getattr(result, "intent", None),
         model_id=result.model_id,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         actual_cost_usd=str(result.cost_usd),
     )
+
+
+@app.post("/v1/transcriptions", tags=["voice"], response_model=TranscriptionResponse)
+async def transcribe_voice_instruction(
+    request: TranscriptionRequest,
+    principal: Annotated[OwnerPrincipal, Depends(_current_owner)],
+) -> TranscriptionResponse:
+    """Transcribes one owner push-to-talk clip. The audio is not persisted and cannot start a task by itself."""
+    if not _live_ai_enabled():
+        raise HTTPException(status_code=503, detail={"code": "live_inference_disabled"})
+    if not store.owns_device(principal.subject, request.device_id):
+        raise HTTPException(status_code=403, detail={"code": "device_not_enrolled"})
+    try:
+        audio = base64.b64decode(request.audio_base64, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise HTTPException(status_code=422, detail={"code": "invalid_audio_encoding"}) from error
+    try:
+        wave = inspect_wave(audio)
+    except InvalidAudio as error:
+        raise HTTPException(status_code=422, detail={"code": "invalid_audio", "reason": str(error)}) from error
+
+    try:
+        reservation = speech_ledger.reserve(uuid4(), _SPEECH_RESERVATION_USD)
+    except BudgetExceeded as error:
+        raise HTTPException(status_code=429, detail={"code": "speech_budget_exhausted"}) from error
+    try:
+        result = await _live_transcriber().transcribe(
+            audio_bytes=audio,
+            mime_type=request.audio_mime_type,
+            language_hint=request.language_hint,
+        )
+    except HTTPException:
+        # Configuration errors are raised before any provider request, so nothing was spent.
+        speech_ledger.release(reservation)
+        raise
+    except Exception as error:
+        # The provider may have billed a failed request; keep the conservative reservation.
+        speech_ledger.reconcile(reservation, _SPEECH_RESERVATION_USD)
+        raise HTTPException(status_code=502, detail={"code": "transcription_provider_error"}) from error
+    speech_ledger.reconcile(reservation, result.cost_usd)
+    return TranscriptionResponse(
+        status="transcribed" if result.transcript else "no_speech",
+        transcript=result.transcript,
+        audio_seconds=round(wave.duration_seconds, 2),
+        model_id=result.model_id,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        actual_cost_usd=str(result.cost_usd),
+    )
+
+
+def _safe_reason(error: Exception) -> str:
+    text = "".join(character for character in str(error) if character.isprintable())
+    return text[:200]
 
 
 def _image_header_matches(image: bytes, mime_type: str) -> bool:

@@ -10,6 +10,11 @@ public sealed record DesktopCapabilities(
     bool SecureCredentialStore,
     string[] Limitations);
 
+/// <summary>
+/// One observation of the display. <see cref="PixelWidth"/>/<see cref="PixelHeight"/> are the physical
+/// display pixels that normalized coordinates map onto; <see cref="ImageWidth"/>/<see cref="ImageHeight"/>
+/// describe the (possibly downscaled) image uploaded to the model.
+/// </summary>
 public sealed record CapturedFrame(
     string ObservationId,
     DateTimeOffset CapturedAt,
@@ -28,7 +33,13 @@ public sealed record CapturedFrame(
     int? ForegroundProcessId,
     string ForegroundWindowTitle,
     long LayoutGeneration,
-    byte[] PngBytes);
+    int ImageWidth,
+    int ImageHeight,
+    string ImageMimeType,
+    byte[] ImageBytes)
+{
+    public string ForegroundProcessName { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// A one-use action capability created by the local supervisor from the active task grant.
@@ -79,9 +90,80 @@ public interface IInputController
     ValueTask ReleaseAllAsync(CancellationToken cancellationToken);
 }
 
-public interface IStopShortcut : IAsyncDisposable
+/// <summary>
+/// The capture and input services a desktop task needs. Implementations stay disarmed until the local
+/// supervisor issues a one-use capability for an owner-submitted task.
+/// </summary>
+public interface IDesktopAutomation : IPlatformAutomation, IInputController
 {
-    ValueTask RegisterAsync(Func<CancellationToken, ValueTask> stop, CancellationToken cancellationToken);
+    double PointerSpeed { get; set; }
+    ValueTask WaitForVisualSettleAsync(TimeSpan minimum, TimeSpan maximum, CancellationToken cancellationToken);
+}
+
+/// <summary>An OS-wide shortcut registered by the signed-in user's Autobots process.</summary>
+public interface IGlobalShortcut : IAsyncDisposable
+{
+    string DisplayName { get; }
+    ValueTask RegisterAsync(Func<CancellationToken, ValueTask> pressed, CancellationToken cancellationToken);
+}
+
+public interface IStopShortcut : IGlobalShortcut
+{
+}
+
+/// <summary>
+/// A visible, click-through indicator anchored to the real pointer while a task runs. It never
+/// receives input and is hidden while Autobots captures its own observations.
+/// </summary>
+public interface IAgentPointerOverlay : IDisposable
+{
+    void Show();
+    void Hide();
+    void SetCaption(string? caption);
+    void SetActivity(PointerActivity activity);
+    void PulseClick();
+    ValueTask SetHiddenForCaptureAsync(bool hidden, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Autobots' own on-screen surfaces (task HUD and pointer indicator). The desktop adapter asks the shell
+/// to hide them for the instant of a screenshot and to move them away from a pointer target, so they
+/// never appear in observations or intercept an action.
+/// </summary>
+public interface IAssistantSurfaces
+{
+    ValueTask SetHiddenForCaptureAsync(bool hidden, CancellationToken cancellationToken);
+    ValueTask EnsurePointClearAsync(int desktopX, int desktopY, CancellationToken cancellationToken);
+}
+
+public enum PointerActivity
+{
+    Idle,
+    Thinking,
+    Moving,
+    Clicking,
+    Typing,
+    Scrolling,
+    Dragging,
+    Waiting
+}
+
+public sealed record MicrophoneRecordingOptions(TimeSpan MaxDuration, TimeSpan TrailingSilence, bool StopOnSilence);
+
+public sealed record RecordedAudio(byte[] WavBytes, TimeSpan Duration, bool SpeechDetected);
+
+/// <summary>
+/// Push-to-talk microphone capture. Recording happens only between an explicit owner start and the
+/// stop token, a trailing-silence stop or the maximum duration; audio stays in memory.
+/// </summary>
+public interface IMicrophoneRecorder
+{
+    bool IsAvailable { get; }
+    ValueTask<RecordedAudio> RecordAsync(
+        MicrophoneRecordingOptions options,
+        IProgress<double>? level,
+        CancellationToken stopToken,
+        CancellationToken cancellationToken);
 }
 
 public interface ISecureCredentialStore
@@ -97,6 +179,32 @@ public interface IInteractiveSessionGate
 }
 
 public sealed class PlatformCapabilityUnavailableException(string message) : NotSupportedException(message)
+{
+}
+
+/// <summary>
+/// The proposed action was not sent because a pre-dispatch check failed. No input reached the OS,
+/// so the task can safely re-observe and continue.
+/// </summary>
+public sealed class ActionNotDispatchedException(string message, Exception? innerException = null)
+    : UnauthorizedAccessException(message, innerException)
+{
+}
+
+/// <summary>
+/// The desktop is in a state Autobots must hand back to the owner, such as the lock screen, a UAC secure
+/// prompt or Autobots' own window being active.
+/// </summary>
+public sealed class DesktopHandoffRequiredException(string message) : InvalidOperationException(message)
+{
+}
+
+/// <summary>
+/// Input stopped part-way through an action after some of it reached the OS. The outcome is uncertain,
+/// so the task must stop and report it instead of retrying.
+/// </summary>
+public sealed class ActionInterruptedException(string message, Exception? innerException = null)
+    : InvalidOperationException(message, innerException)
 {
 }
 
@@ -120,5 +228,19 @@ public static class DisplayCoordinateTransform
         var x = (int)Math.Round(normalizedX * (pixelWidth - 1) / 999d, MidpointRounding.AwayFromZero);
         var y = (int)Math.Round(normalizedY * (pixelHeight - 1) / 999d, MidpointRounding.AwayFromZero);
         return (desktopOriginX + x, desktopOriginY + y);
+    }
+
+    /// <summary>
+    /// Returns the largest image size that fits within the bounds while preserving the display aspect ratio.
+    /// Normalized model coordinates are independent of this scale.
+    /// </summary>
+    public static (int Width, int Height) FitWithin(int pixelWidth, int pixelHeight, int maxWidth, int maxHeight)
+    {
+        if (pixelWidth <= 0 || pixelHeight <= 0)
+            throw new ArgumentOutOfRangeException(nameof(pixelWidth), "Display dimensions must be positive.");
+        if (maxWidth <= 0 || maxHeight <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxWidth), "Image bounds must be positive.");
+        var scale = Math.Min(1d, Math.Min(maxWidth / (double)pixelWidth, maxHeight / (double)pixelHeight));
+        return (Math.Max(1, (int)Math.Round(pixelWidth * scale)), Math.Max(1, (int)Math.Round(pixelHeight * scale)));
     }
 }

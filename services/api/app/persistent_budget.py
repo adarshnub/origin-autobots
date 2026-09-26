@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
@@ -10,17 +11,27 @@ from uuid import UUID, uuid4
 from services.api.app.budget import BudgetExceeded, BudgetLimits, _money, _utc
 
 
-class SQLiteBudgetLedger:
-    """SQLite-backed inference ledger with serialized reservations across API workers."""
+_LEDGER_TABLES = {"inference_reservations", "speech_reservations"}
 
-    def __init__(self, path: str | Path, limits: BudgetLimits = BudgetLimits()) -> None:
+
+class SQLiteBudgetLedger:
+    """SQLite-backed spend ledger with serialized reservations across API workers.
+
+    Each ledger table is accounted separately, so speech transcription never consumes the
+    desktop-action inference budget and vice versa.
+    """
+
+    def __init__(self, path: str | Path, limits: BudgetLimits = BudgetLimits(), *, table: str = "inference_reservations") -> None:
+        if table not in _LEDGER_TABLES or not re.fullmatch(r"[a-z_]+", table):
+            raise ValueError("Unknown budget ledger table")
         self.path = Path(path)
         self.limits = limits
+        self.table = table
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as connection:
             connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS inference_reservations (
+                f"""
+                CREATE TABLE IF NOT EXISTS {self.table} (
                     reservation_id TEXT PRIMARY KEY,
                     task_id TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -50,9 +61,9 @@ class SQLiteBudgetLedger:
 
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
-            task_total = _total(connection, "task_id = ?", (str(task_id),))
-            day_total = _total(connection, "utc_day = ?", (utc_day,))
-            month_total = _total(connection, "utc_month = ?", (utc_month,))
+            task_total = _total(connection, self.table, "task_id = ?", (str(task_id),))
+            day_total = _total(connection, self.table, "utc_day = ?", (utc_day,))
+            month_total = _total(connection, self.table, "utc_month = ?", (utc_month,))
             if task_total + estimate > self.limits.per_task_usd:
                 connection.rollback()
                 raise BudgetExceeded("Per-task inference budget would be exceeded")
@@ -63,7 +74,7 @@ class SQLiteBudgetLedger:
                 connection.rollback()
                 raise BudgetExceeded("Monthly inference budget would be exceeded")
             connection.execute(
-                "INSERT INTO inference_reservations(reservation_id, task_id, created_at, utc_day, utc_month, reserved_usd, status) VALUES(?, ?, ?, ?, ?, ?, 'pending')",
+                f"INSERT INTO {self.table}(reservation_id, task_id, created_at, utc_day, utc_month, reserved_usd, status) VALUES(?, ?, ?, ?, ?, ?, 'pending')",
                 (str(reservation_id), str(task_id), current.isoformat(), utc_day, utc_month, str(estimate)),
             )
             connection.commit()
@@ -74,14 +85,14 @@ class SQLiteBudgetLedger:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT reserved_usd FROM inference_reservations WHERE reservation_id = ? AND status = 'pending'",
+                f"SELECT reserved_usd FROM {self.table} WHERE reservation_id = ? AND status = 'pending'",
                 (str(reservation_id),),
             ).fetchone()
             if row is None:
                 connection.rollback()
                 raise KeyError("Reservation is missing, expired, or already reconciled")
             connection.execute(
-                "UPDATE inference_reservations SET actual_usd = ?, status = 'reconciled' WHERE reservation_id = ?",
+                f"UPDATE {self.table} SET actual_usd = ?, status = 'reconciled' WHERE reservation_id = ?",
                 (str(actual), str(reservation_id)),
             )
             connection.commit()
@@ -90,16 +101,16 @@ class SQLiteBudgetLedger:
     def release(self, reservation_id: UUID) -> None:
         with closing(self._connect()) as connection:
             cursor = connection.execute(
-                "UPDATE inference_reservations SET status = 'released' WHERE reservation_id = ? AND status = 'pending'",
+                f"UPDATE {self.table} SET status = 'released' WHERE reservation_id = ? AND status = 'pending'",
                 (str(reservation_id),),
             )
             if cursor.rowcount != 1:
                 raise KeyError("Reservation is missing or already completed")
 
 
-def _total(connection: sqlite3.Connection, predicate: str, values: tuple[str, ...]) -> Decimal:
+def _total(connection: sqlite3.Connection, table: str, predicate: str, values: tuple[str, ...]) -> Decimal:
     rows = connection.execute(
-        f"SELECT reserved_usd, actual_usd, status FROM inference_reservations WHERE {predicate}",
+        f"SELECT reserved_usd, actual_usd, status FROM {table} WHERE {predicate}",
         values,
     ).fetchall()
     total = sum(

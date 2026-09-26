@@ -7,6 +7,12 @@ public sealed record TaskLease(Guid TaskId, Guid DeviceId, Guid LeaseId, long Ep
 
 public sealed class LocalTaskSupervisor : IDisposable
 {
+    /// <summary>
+    /// How long a one-use action capability stays valid. It covers visible, paced pointer motion and
+    /// typing; the executor still re-checks focus, layout and cancellation before every input batch.
+    /// </summary>
+    public static readonly TimeSpan ActionCapabilityLifetime = TimeSpan.FromSeconds(15);
+
     private readonly object _gate = new();
     private readonly HashSet<Guid> _actionIds = [];
     private CancellationTokenSource? _activeCancellation;
@@ -93,7 +99,7 @@ public sealed class LocalTaskSupervisor : IDisposable
 
             _lastSequence = envelope.Sequence;
             _actionIds.Add(envelope.ActionId);
-            authorizedAction = new AuthorizedAction(envelope, observation, authorizedAt, authorizedAt.AddSeconds(5));
+            authorizedAction = new AuthorizedAction(envelope, observation, authorizedAt, authorizedAt.Add(ActionCapabilityLifetime));
             rejectionReason = string.Empty;
             return true;
         }
@@ -145,6 +151,7 @@ public sealed class LocalTaskSupervisor : IDisposable
         if (!ActionIsValid(envelope.Action))
             return Reject("The action payload is invalid.", out rejectionReason);
         if (observation.PixelWidth <= 0 || observation.PixelHeight <= 0 || observation.LayoutGeneration <= 0 ||
+            observation.ImageWidth <= 0 || observation.ImageHeight <= 0 ||
             observation.VirtualDesktopWidth <= 0 || observation.VirtualDesktopHeight <= 0 ||
             !double.IsFinite(observation.DpiX) || !double.IsFinite(observation.DpiY) || observation.DpiX <= 0 || observation.DpiY <= 0)
             return Reject("The screen observation has invalid display metadata.", out rejectionReason);
@@ -165,11 +172,15 @@ public sealed class LocalTaskSupervisor : IDisposable
 
     private static bool ActionIsValid(ProposedAction action) => action switch
     {
-        ClickAction click => click.X is >= 0 and <= 999 && click.Y is >= 0 and <= 999 && Enum.IsDefined(click.Button),
-        TypeTextAction text => text.Text.Length is > 0 and <= 1000,
-        KeyPressAction key => key.Key.Length is > 0 and <= 32,
-        ScrollAction scroll => scroll.X is >= 0 and <= 999 && scroll.Y is >= 0 and <= 999 && scroll.DeltaX is >= -1200 and <= 1200 && scroll.DeltaY is >= -1200 and <= 1200,
+        ClickAction click => IsPoint(click.X, click.Y) && Enum.IsDefined(click.Button) && click.Clicks is >= 1 and <= 3,
+        TypeTextAction text => text.Text.Length is > 0 and <= 4000,
+        KeyPressAction key => key.Key.Length is > 0 and <= 64,
+        ScrollAction scroll => IsPoint(scroll.X, scroll.Y) && scroll.DeltaX is >= -1200 and <= 1200 && scroll.DeltaY is >= -1200 and <= 1200,
         WaitAction wait => wait.DurationMs is >= 0 and <= 5000,
+        MoveAction move => IsPoint(move.X, move.Y),
+        DragAction drag => IsPoint(drag.X, drag.Y) && IsPoint(drag.ToX, drag.ToY),
         _ => false
     };
+
+    private static bool IsPoint(int x, int y) => x is >= 0 and <= 999 && y is >= 0 and <= 999;
 }
