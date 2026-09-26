@@ -2,6 +2,17 @@
 
 Updated 26 September 2026.
 
+## 26 September 2026 — flying robot website redesign
+
+- **Components:** Replaced the active landing page and developer-page design with a light lavender product layout and locally hosted Manrope fonts. Added three procedural 3D helper robots with rounded bodies, binocular eyes, blinking, cursor tracking, arm motion, jet effects, task cards, and section-based scroll flight paths. The current React/Vite and React Three Fiber stack already supports these features; no Next.js migration or package installation was needed.
+- **App images:** Copied the existing app-home, working-preview, settings-preview and floating-pilot screenshots into `apps/website/src/assets`. The home image is a packaged-app screenshot; activity/settings images are existing disarmed UI previews. The website identifies the activity as sample UI preview content. Added screenshot selection, a timed walkthrough, and an expandable image dialog. No desktop input or live app task was performed to obtain these assets.
+- **Run commands:** `npm exec vite build`, `scripts/deploy_website_aws.ps1`, and `aws cloudfront wait invalidation-completed` for `I8I79ZYFYT29D2I0VNTZVX3AUN` on distribution `E21MANSPJEWFLG`.
+- **Evidence:** Vite production build completed in 5.60 seconds; the upload script exited successfully; the CloudFront invalidation completed. The updated public URL remains `https://d39k5o9aaxn0fs.cloudfront.net`.
+- **Tests actually executed:** None. Browser/UI testing remains skipped at the owner's earlier request. Source screenshots were viewed before including them; runtime appearance is not claimed verified.
+- **Limitations:** Windows still links to private pilot access until an approved public download URL exists. The screenshots show app UI and sample activity, not a recorded successful automation task. The main shared JS chunk is approximately 1.20 MB (333 KB gzip); no runtime performance measurement was made.
+- **Cloud resources changed:** Updated website objects in the existing S3 origin and invalidated CloudFront. No infrastructure resources were created, changed or destroyed.
+- **Next task:** Owner visual review of the redesigned site; a live task recording and public Windows release remain separate work.
+
 ## 26 September 2026 — public website AWS deployment
 
 - **Components:** Added an isolated Terraform root at `infra/aws/website` for a private, versioned and encrypted S3 origin with public-access blocking, CloudFront origin access control, a read-only distribution-scoped bucket policy, and an HTTPS CloudFront distribution. Added `scripts/deploy_website_aws.ps1` to upload the built pages and assets and invalidate CloudFront.

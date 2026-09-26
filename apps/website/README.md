@@ -1,6 +1,6 @@
 # Autobots website
 
-This Vite project builds a two-page public site: `/index.html` and `/developer/index.html`. A single fixed React Three Fiber canvas responds to scroll and pointer position behind the landing page sections. The product walkthrough is an illustration, not a recorded or live task.
+This React/Vite project builds a two-page public site: `/index.html` and `/developer/index.html`. The active entry points use `Landing.tsx`, `BotsScene.tsx`, `ui.tsx`, and `design.css`. A single fixed React Three Fiber canvas animates three helper robots along section-based scroll flight paths, with cursor tracking and idle expressions. The product gallery uses screenshots of the actual app and disarmed sample UI states, not a recorded live task. Screenshot assets and the OFL-licensed Manrope fonts are included under `src/assets/`.
 
 The Windows pilot remains private and unsigned. By default the Windows card links to Adarsh's LinkedIn profile to request access. When a public release is approved and hosted, set `VITE_WINDOWS_DOWNLOAD_URL` to its download URL at build time. The site never bundles the owner-only ZIP from `artifacts/`.
 
