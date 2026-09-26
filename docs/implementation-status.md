@@ -2,6 +2,17 @@
 
 Updated 26 September 2026.
 
+## 26 September 2026 — expanded developer portfolio
+
+- **Components:** Updated the developer page with the owner's current company, Ant Venture.ai, a fuller bio, GitHub account `adarshnub`, background and technology sections, three project spotlights, and 22 selected project summaries. Added category filters, counts, text search, an empty-state reset, technology tags and direct repository links. Added page-specific responsive CSS and updated title/description metadata.
+- **Content evidence:** Read the public GitHub profile, repository metadata, READMEs and selected source files. All six pinned repositories are represented. Project summaries distinguish prototypes and frontend work; see [developer project sources](developer-project-sources.md). The owner correction supersedes the older TGH Tech reference. No private repository access was used.
+- **Run commands:** `npm exec vite build` in `apps/website`; `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy_website_aws.ps1`; `aws cloudfront wait invalidation-completed --distribution-id E21MANSPJEWFLG --id IAZCKG5ELQJNVA3Z4YE6IFL9NF`.
+- **Evidence:** Production build completed in 1.01 seconds. Website upload exited successfully and CloudFront invalidation `IAZCKG5ELQJNVA3Z4YE6IFL9NF` completed. Developer page URL: `https://d39k5o9aaxn0fs.cloudfront.net/developer/index.html`.
+- **Tests actually executed:** None. App/browser testing, type checking, accessibility audits, live demo visits and HTTP checks were skipped at the owner's request. Production compilation generated deployment artifacts; it is not runtime/UI evidence.
+- **Limitations and measured metrics:** Repository descriptions reflect documentation/source rather than independently exercised projects. Developer JS is 21.05 kB (6.81 kB gzip); developer CSS is 10.90 kB (2.75 kB gzip). The existing shared 3D JS chunk remains 1,200.02 kB (333.18 kB gzip) and emits Vite's size warning. No runtime metrics were collected.
+- **Cloud resources changed:** Uploaded static objects to the existing website S3 origin and invalidated the existing CloudFront distribution. No infrastructure resources were created or altered. No dependency installation, release publication, desktop control or model call was performed.
+- **Next task:** Owner review of the expanded public profile and project selection. No required implementation work remains for this portfolio update.
+
 ## 26 September 2026 — flying robot website redesign
 
 - **Components:** Replaced the active landing page and developer-page design with a light lavender product layout and locally hosted Manrope fonts. Added three procedural 3D helper robots with rounded bodies, binocular eyes, blinking, cursor tracking, arm motion, jet effects, task cards, and section-based scroll flight paths. The current React/Vite and React Three Fiber stack already supports these features; no Next.js migration or package installation was needed.

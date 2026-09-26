@@ -1,5 +1,9 @@
 # Capability and toolchain findings
 
+## Developer portfolio expansion — 26 September 2026
+
+The developer page now identifies Ant Venture.ai as the current company using the owner's correction, and links GitHub account `adarshnub`. Public GitHub documentation and selected source files provided the basis for 22 project summaries, categorized filtering, text search, and three featured projects. The existing React/Vite dependencies were sufficient; no installation or framework migration was needed. See [portfolio source notes](developer-project-sources.md). Only the production build and AWS publication workflow were run; application and browser testing remain skipped at the owner's request.
+
 ## Website implementation note — 26 September 2026
 
 The formerly blank `apps/website` project now contains a two-page Vite/React product site. The landing page uses the existing pinned React Three Fiber/Three.js packages for a continuous scroll and cursor responsive scene, and includes an illustrative task walkthrough. The separate developer page uses publicly visible details from the owner-supplied LinkedIn profile. A production build was generated and uploaded to a new AWS CloudFront distribution at `https://d39k5o9aaxn0fs.cloudfront.net`; the distribution and cache invalidation completed. The owner requested no browser or application checks, so actual rendered behavior was not verified. The private unsigned Windows pilot ZIP is not exposed as a public download.
