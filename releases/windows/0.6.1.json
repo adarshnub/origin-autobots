@@ -1,0 +1,11 @@
+{
+  "version": "0.6.1",
+  "platform": "windows",
+  "publishedAt": "2026-09-26T18:18:00Z",
+  "headline": "Access checks across every desktop action path",
+  "changes": [
+    "Checks pilot access before each Calendar field adapter action as well as model-proposed actions.",
+    "Stops the local task and signs out when the owner revokes pilot access.",
+    "Continues to check account access while the Windows app is open."
+  ]
+}

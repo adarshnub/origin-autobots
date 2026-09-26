@@ -80,6 +80,9 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
     public Task<JsonElement> GetUsageAsync(string accessToken, CancellationToken cancellationToken) =>
         SendJsonAsync<JsonElement>(HttpMethod.Get, "/v1/usage", accessToken, null, cancellationToken);
 
+    public Task<JsonElement> GetPilotAccessAsync(string accessToken, CancellationToken cancellationToken) =>
+        SendJsonAsync<JsonElement>(HttpMethod.Get, "/v1/pilot/me", accessToken, null, cancellationToken);
+
     public async Task<ActionProposalResponse> ProposeActionAsync(
         string accessToken,
         Guid taskId,
@@ -179,6 +182,7 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
             "device_not_enrolled" => "This PC isn't enrolled with your Autobots account yet.",
             "pilot_profile_required" => "Finish your username and purpose in the pilot portal, then try again: https://autobots.origin-studio.in/pilot/index.html",
             "pilot_not_invited" => "This account has not been invited to the Autobots pilot.",
+            "pilot_revoked" => "Your pilot access was revoked. Autobots has stopped and signed out on this device.",
             _ when statusCode is 401 => "Your Autobots sign-in expired. Connect your account again.",
             _ when statusCode is 403 => "This account isn't allowed to use Autobots.",
             _ when statusCode >= 500 => $"The Autobots service had a problem ({statusCode}). Try again in a moment.",

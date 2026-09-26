@@ -179,6 +179,21 @@ class SQLiteTaskStore:
             connection.commit()
             return _task(updated)
 
+    def stop_all_owner_tasks(self, owner_sub: str) -> int:
+        """Invalidate every nonterminal cloud task when the owner's pilot grant is revoked."""
+        now = _timestamp()
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute("""SELECT task_id FROM tasks WHERE owner_sub=?
+                AND status NOT IN ('completed','stopped','failed','blocked','out_of_budget')""", (owner_sub,)).fetchall()
+            for row in rows:
+                connection.execute("""UPDATE tasks SET status='stopped',epoch=epoch+1,updated_at=?
+                    WHERE owner_sub=? AND task_id=?""", (now, owner_sub, row["task_id"]))
+                connection.execute("""INSERT INTO task_events(task_id,owner_sub,event_type,event_data,created_at)
+                    VALUES(?,?,'access_revoked','{}',?)""", (row["task_id"], owner_sub, now))
+            connection.commit()
+        return len(rows)
+
     def record_event(self, owner_sub: str, task_id: UUID, event_type: str, event_data: dict[str, object]) -> bool:
         with closing(self._connect()) as connection:
             row = connection.execute("SELECT 1 FROM tasks WHERE owner_sub = ? AND task_id = ?", (owner_sub, str(task_id))).fetchone()

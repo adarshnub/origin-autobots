@@ -2,22 +2,24 @@ from __future__ import annotations
 
 import base64
 import binascii
+from collections import deque
 import logging
 import os
+from threading import Lock
 import time
 from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.contracts.generated.python.action import ActionEnvelope
 from services.api.app.auth import OwnerPrincipal, require_member, require_owner
-from services.api.app.cognito_invites import InviteUnavailable, invite
-from services.api.app.pilots import PilotStore
+from services.api.app.cognito_invites import InviteUnavailable, disable_user, invite
+from services.api.app.pilots import PilotApplicationStore, PilotStore
 from services.api.app.budget import BudgetExceeded, BudgetLimits
 from services.api.app.google_provider import (
     GoogleCloudModelProvider,
@@ -31,9 +33,9 @@ from services.api.app.storage import IdempotencyConflict, SQLiteTaskStore, Store
 from services.api.app.usage import UsageStore, aws_billing
 
 
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 # Advertised so the desktop client can detect an older deployed API and omit newer request fields.
-API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting", "calendar-field-observation", "invite-only-pilots")
+API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting", "calendar-field-observation", "invite-only-pilots", "pilot-applications", "pilot-revocation")
 
 app = FastAPI(
     title="Autobots by Origin Studios API",
@@ -56,6 +58,15 @@ class PilotInviteRequest(StrictModel):
 class PilotProfileRequest(StrictModel):
     username: str = Field(min_length=2, max_length=60)
     purpose: str = Field(min_length=10, max_length=500)
+
+
+class PilotApplicationRequest(StrictModel):
+    email: str = Field(min_length=5, max_length=254, pattern=r"^[^\s@,]+@[^\s@,]+\.[^\s@,]+$")
+    name: str = Field(min_length=2, max_length=80)
+    profession: str = Field(min_length=2, max_length=80)
+    industry: str = Field(min_length=2, max_length=80)
+    purpose: str = Field(min_length=10, max_length=500)
+    website: str = Field(default="", max_length=200)
 
 
 class DeviceEnrollmentRequest(StrictModel):
@@ -164,16 +175,44 @@ store = SQLiteTaskStore()
 budget_ledger = SQLiteBudgetLedger(store.path, _budget_limits())
 speech_ledger = SQLiteBudgetLedger(store.path, _speech_budget_limits(), table="speech_reservations")
 pilots = PilotStore(store.path)
+pilot_applications = PilotApplicationStore(store.path)
 _SPEECH_RESERVATION_USD = Decimal("0.002")
 _PILOT_LIFETIME_USD = Decimal("10.00")
+_application_lock = Lock()
+_application_attempts: dict[str, deque[float]] = {}
+
+
+def _limit_public_application(client_host: str) -> None:
+    """Bound anonymous form traffic without storing addresses in the database or logs."""
+    now = time.monotonic()
+    with _application_lock:
+        if len(_application_attempts) > 2048:
+            for key, entries in list(_application_attempts.items()):
+                if not entries or entries[-1] < now - 3600:
+                    del _application_attempts[key]
+        if client_host not in _application_attempts and len(_application_attempts) >= 4096:
+            raise HTTPException(status_code=429, detail={"code": "application_rate_limited"})
+        recent = _application_attempts.setdefault(client_host, deque())
+        while recent and recent[0] < now - 3600:
+            recent.popleft()
+        if len(recent) >= 5:
+            raise HTTPException(status_code=429, detail={"code": "application_rate_limited"})
+        recent.append(now)
+
+
+def _pilot_access(subject: str) -> dict:
+    profile = pilots.get(subject)
+    if not profile:
+        raise HTTPException(status_code=403, detail={"code": "pilot_not_invited"})
+    if not profile["enabled"]:
+        raise HTTPException(status_code=403, detail={"code": "pilot_revoked"})
+    return profile
 
 
 def _current_owner(authorization: Annotated[str | None, Header()] = None) -> OwnerPrincipal:
     principal = require_member(authorization)
     if principal.role == "pilot":
-        profile = pilots.get(principal.subject)
-        if not profile or not profile["enabled"]:
-            raise HTTPException(status_code=403, detail={"code": "pilot_not_invited"})
+        profile = _pilot_access(principal.subject)
         if not profile["onboarded_at"]:
             raise HTTPException(status_code=403, detail={"code": "pilot_profile_required"})
     return principal
@@ -191,12 +230,86 @@ def _current_admin(authorization: Annotated[str | None, Header()] = None) -> Own
 async def pilot_me(principal: Annotated[OwnerPrincipal, Depends(_current_member)]) -> dict:
     if principal.role == "owner":
         return {"role": "owner", "subject": principal.subject}
-    profile = pilots.get(principal.subject)
-    if not profile or not profile["enabled"]:
-        raise HTTPException(status_code=403, detail={"code": "pilot_not_invited"})
+    profile = _pilot_access(principal.subject)
     return {"role": "pilot", "profile": profile,
             "lifetime_limit_usd": str(_PILOT_LIFETIME_USD),
             "lifetime_used_usd": str(budget_ledger.lifetime_spend(principal.subject))}
+
+
+@app.post("/v1/pilot/applications", tags=["pilot"], status_code=202)
+async def apply_for_pilot(request: PilotApplicationRequest, browser: Request) -> dict:
+    _limit_public_application(browser.client.host if browser.client else "unknown")
+    if request.website:
+        return {"status": "received"}
+    fields = (request.name.strip(), request.profession.strip(), request.industry.strip(), request.purpose.strip())
+    if any(len(value) < (10 if index == 3 else 2) for index, value in enumerate(fields)):
+        raise HTTPException(status_code=422, detail={"code": "application_fields_required"})
+    pilot_applications.submit(request.email.strip().lower(), *fields)
+    # The same response for new and existing emails avoids account enumeration.
+    return {"status": "received"}
+
+
+@app.get("/v1/admin/pilot-applications", tags=["admin"])
+async def admin_pilot_applications(principal: Annotated[OwnerPrincipal, Depends(_current_admin)]) -> dict:
+    return {"applications": pilot_applications.list()}
+
+
+@app.post("/v1/admin/pilot-applications/{application_id}/approve", tags=["admin"])
+async def approve_pilot_application(
+    application_id: UUID, principal: Annotated[OwnerPrincipal, Depends(_current_admin)]
+) -> dict:
+    application = pilot_applications.get(str(application_id))
+    if not application or application["status"] not in {"pending", "rejected"}:
+        raise HTTPException(status_code=409, detail={"code": "application_not_pending"})
+    if application["email"] == os.getenv("AUTOBOTS_OWNER_EMAIL", "").lower():
+        raise HTTPException(status_code=409, detail={"code": "owner_cannot_be_invited"})
+    existing = pilots.get_by_email(application["email"])
+    if existing and not existing["enabled"]:
+        raise HTTPException(status_code=409, detail={"code": "pilot_access_revoked"})
+    if not pilot_applications.claim_approval(str(application_id), principal.subject):
+        raise HTTPException(status_code=409, detail={"code": "application_not_pending"})
+    if existing:
+        pilot_applications.approve(str(application_id), existing["subject"])
+        return {"status": "approved", "email": application["email"], "invitation": "already_invited"}
+    try:
+        subject = await invite(application["email"])
+        pilots.add(subject, application["email"])
+        pilot_applications.approve(str(application_id), subject)
+    except Exception as error:
+        # The external invitation might have succeeded. Keep 'approving' for manual
+        # review instead of retrying a possibly completed non-idempotent email.
+        logger.error("pilot_approval_uncertain class=%s", type(error).__name__)
+        raise HTTPException(status_code=503, detail={"code": "application_approval_uncertain"}) from error
+    return {"status": "approved", "email": application["email"], "invitation": "sent"}
+
+
+@app.post("/v1/admin/pilot-applications/{application_id}/reject", tags=["admin"])
+async def reject_pilot_application(
+    application_id: UUID, principal: Annotated[OwnerPrincipal, Depends(_current_admin)]
+) -> dict:
+    if not pilot_applications.reject(str(application_id), principal.subject):
+        raise HTTPException(status_code=409, detail={"code": "application_not_pending"})
+    return {"status": "rejected"}
+
+
+@app.post("/v1/admin/pilots/{subject}/revoke", tags=["admin"])
+async def revoke_pilot_access(
+    subject: UUID, principal: Annotated[OwnerPrincipal, Depends(_current_admin)]
+) -> dict:
+    if str(subject) == principal.subject:
+        raise HTTPException(status_code=403, detail={"code": "owner_cannot_be_revoked"})
+    profile = pilots.revoke(str(subject))
+    if not profile:
+        raise HTTPException(status_code=404, detail={"code": "pilot_not_found"})
+    stopped_tasks = store.stop_all_owner_tasks(str(subject))
+    try:
+        await disable_user(profile["email"])
+        pilots.mark_cognito_disabled(str(subject))
+        provider_signout = "completed"
+    except InviteUnavailable as error:
+        logger.error("pilot_cognito_disable_pending class=%s", type(error).__name__)
+        provider_signout = "pending"
+    return {"status": "revoked", "provider_signout": provider_signout, "stopped_tasks": stopped_tasks}
 
 
 @app.post("/v1/pilot/profile", tags=["pilot"])
@@ -301,6 +414,12 @@ async def create_task(
         task, _created = store.create_task(principal.subject, request.device_id, request.instruction, idempotency_key)
     except IdempotencyConflict as error:
         raise HTTPException(status_code=409, detail={"code": "idempotency_conflict"}) from error
+    if principal.role == "pilot":
+        try:
+            _pilot_access(principal.subject)
+        except HTTPException:
+            store.stop_task(principal.subject, task.task_id)
+            raise
     return _task_response(task)
 
 
@@ -409,6 +528,8 @@ async def propose_action(
     usage.record(reservation, principal.subject, "desktop", "response", request_started, result)
     if reservation:
         budget_ledger.reconcile(reservation, result.cost_usd)
+    if principal.role == "pilot":
+        _pilot_access(principal.subject)
     latest_task = store.get_task(principal.subject, task_id)
     # The device's lease epoch spans multiple tasks; a new server task starts at epoch zero.
     # Detect cloud STOP against the server snapshot taken before inference, while preserving the
@@ -511,6 +632,8 @@ async def transcribe_voice_instruction(
         raise HTTPException(status_code=502, detail={"code": "transcription_provider_error"}) from error
     usage.record(reservation, principal.subject, "speech", "transcribed" if result.transcript else "no_speech", request_started, result)
     speech_ledger.reconcile(reservation, result.cost_usd)
+    if principal.role == "pilot":
+        _pilot_access(principal.subject)
     return TranscriptionResponse(
         status="transcribed" if result.transcript else "no_speech",
         transcript=result.transcript,

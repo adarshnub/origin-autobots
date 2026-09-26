@@ -37,7 +37,12 @@ resource "aws_iam_role_policy" "api_pilot_invites" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      Action = ["cognito-idp:AdminCreateUser", "cognito-idp:AdminAddUserToGroup"]
+      Action = [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminAddUserToGroup",
+        "cognito-idp:AdminDisableUser",
+        "cognito-idp:AdminUserGlobalSignOut"
+      ]
       Resource = aws_cognito_user_pool.owner.arn
     }]
   })

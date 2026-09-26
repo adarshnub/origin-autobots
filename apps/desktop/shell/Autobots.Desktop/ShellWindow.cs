@@ -59,6 +59,9 @@ public sealed class ShellWindow : Window
     private CancellationTokenSource? _voiceSession;
     private CancellationTokenSource? _voiceStop;
     private DispatcherTimer? _countdown;
+    private readonly DispatcherTimer _accessTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private bool _accessCheckRunning;
+    private bool _accessRevoked;
     private string? _pendingVoiceTask;
     private bool _signingIn;
     private bool _quitting;
@@ -448,6 +451,8 @@ public sealed class ShellWindow : Window
         _hud.OpenAppRequested += (_, _) => ShowFromTray();
         Opened += async (_, _) => await OnOpenedAsync();
         Closing += OnClosing;
+        _accessTimer.Tick += async (_, _) => await CheckPilotAccessAsync();
+        _accessTimer.Start();
 
         RefreshAccount();
         RefreshLimits();
@@ -473,6 +478,7 @@ public sealed class ShellWindow : Window
     public async void QuitApplication()
     {
         _quitting = true;
+        _accessTimer.Stop();
         StopEverything("quit");
         _hud.Close();
         await _services.DisposeAsync();
@@ -616,7 +622,7 @@ public sealed class ShellWindow : Window
 
     private async Task<bool> SignInAsync()
     {
-        if (_login is null || _signingIn)
+        if (_login is null || _api is null || _signingIn || _accessRevoked)
             return false;
         if (_login.IsSignedIn)
             return true;
@@ -626,12 +632,24 @@ public sealed class ShellWindow : Window
         try
         {
             await _login.SignInAsync(CancellationToken.None);
+            var accessToken = await _login.GetAccessTokenAsync(CancellationToken.None);
+            await _api.GetPilotAccessAsync(accessToken, CancellationToken.None);
             SetIdleStatus();
             Activate();
             return true;
         }
+        catch (AutobotsApiException error)
+        {
+            _login.SignOut();
+            if (error.Code == "pilot_revoked")
+                HandleRevokedAccess();
+            else
+                SetStatus(error.Message, Ui.WarningBrush);
+            return false;
+        }
         catch (Exception error) when (error is InvalidOperationException or TimeoutException or HttpRequestException or SocketException or System.ComponentModel.Win32Exception or OperationCanceledException)
         {
+            _login.SignOut();
             SetStatus($"Sign-in wasn't completed: {error.Message}", Ui.WarningBrush);
             return false;
         }
@@ -645,7 +663,9 @@ public sealed class ShellWindow : Window
     private void RefreshAccount()
     {
         var connected = _login?.IsSignedIn == true;
-        var label = _signingIn ? "Waiting for browser…" : connected ? "Connected" : "Connect account";
+        if (_accessRevoked)
+            connected = false;
+        var label = _accessRevoked ? "Access revoked" : _signingIn ? "Waiting for browser…" : connected ? "Connected" : "Connect account";
         _accountButton.Content = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -661,7 +681,47 @@ public sealed class ShellWindow : Window
         ToolTip.SetTip(_accountButton, connected
             ? "This PC is connected to your private Autobots service. Google and other app sign-ins stay in your browser."
             : "Sign in to your private Autobots account (separate from Google).");
-        _accountButton.IsEnabled = _login is not null && !connected && !_signingIn;
+        _accountButton.IsEnabled = _login is not null && !connected && !_signingIn && !_accessRevoked;
+    }
+
+    private async Task CheckPilotAccessAsync()
+    {
+        if (_accessCheckRunning || _accessRevoked || _quitting || _login?.IsSignedIn != true || _api is null)
+            return;
+        _accessCheckRunning = true;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            var accessToken = await _login.GetAccessTokenAsync(timeout.Token);
+            await _api.GetPilotAccessAsync(accessToken, timeout.Token);
+        }
+        catch (AutobotsApiException error) when (error.Code == "pilot_revoked")
+        {
+            HandleRevokedAccess();
+        }
+        catch (Exception error) when (error is AutobotsApiException or InvalidOperationException or HttpRequestException or OperationCanceledException)
+        {
+            // A network failure is not proof of revocation. Protected API calls still
+            // require a live server-side grant before they can use AI or control input.
+        }
+        finally
+        {
+            _accessCheckRunning = false;
+        }
+    }
+
+    private void HandleRevokedAccess()
+    {
+        if (_accessRevoked)
+            return;
+        _accessRevoked = true;
+        StopEverything("pilot access revoked");
+        _login?.SignOut();
+        _accessTimer.Stop();
+        _hud.ShowResult(HudTone.Warning, "Pilot access revoked", "Autobots stopped and signed out on this device.", TimeSpan.FromSeconds(15));
+        SetStatus("Pilot access was revoked. Autobots is signed out on this device.", Ui.WarningBrush);
+        RefreshAccount();
+        SetIdleUi();
     }
 
     // ---- Tasks ---------------------------------------------------------------------------------
@@ -680,6 +740,11 @@ public sealed class ShellWindow : Window
 
     private async Task StartTaskAsync(string instruction)
     {
+        if (_accessRevoked)
+        {
+            SetStatus("Pilot access was revoked. Autobots cannot start tasks.", Ui.WarningBrush);
+            return;
+        }
         if (_runner is null)
         {
             SetStatus(_configurationError ?? "Desktop control isn't available on this system.", Ui.WarningBrush);
@@ -720,6 +785,12 @@ public sealed class ShellWindow : Window
         }
 
         SetIdleUi();
+        if (_runner.AccessRevoked || _accessRevoked)
+        {
+            HandleRevokedAccess();
+            SetIdleStatus();
+            return;
+        }
         var tone = result.Outcome switch
         {
             AgentOutcome.Completed => HudTone.Success,
@@ -783,6 +854,11 @@ public sealed class ShellWindow : Window
 
     private async Task ToggleVoiceAsync()
     {
+        if (_accessRevoked)
+        {
+            _hud.ShowResult(HudTone.Warning, "Pilot access revoked", "Autobots is signed out on this device.", TimeSpan.FromSeconds(6));
+            return;
+        }
         if (_voiceSession is not null)
         {
             // A second press finishes the recording.
@@ -937,10 +1013,10 @@ public sealed class ShellWindow : Window
     {
         _startButton.Content = Ui.ButtonContent(Icons.Play, "Start", 16, Ui.Solid("#03211C"));
         Ui.Skin(_startButton, Ui.ButtonKind.Accent);
-        _startButton.IsEnabled = _runner is not null;
+        _startButton.IsEnabled = _runner is not null && !_accessRevoked;
         AutomationProperties.SetName(_startButton, "Start task");
-        _composer.IsReadOnly = false;
-        _micButton.IsEnabled = _services.Microphone is not null;
+        _composer.IsReadOnly = _accessRevoked;
+        _micButton.IsEnabled = _services.Microphone is not null && !_accessRevoked;
     }
 
     private void SetRunningUi()
@@ -965,7 +1041,9 @@ public sealed class ShellWindow : Window
 
     private void SetIdleStatus()
     {
-        if (_configurationError is not null)
+        if (_accessRevoked)
+            SetStatus("Pilot access was revoked. Autobots is signed out on this device.", Ui.WarningBrush);
+        else if (_configurationError is not null)
             SetStatus("Setup needs attention — see the message above.", Ui.WarningBrush);
         else if (_login?.IsSignedIn == true)
             SetStatus("Ready. Your mouse and keyboard are yours until you start a task.", Ui.SuccessBrush);

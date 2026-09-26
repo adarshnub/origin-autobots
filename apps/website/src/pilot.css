@@ -58,6 +58,8 @@ a { color: inherit; text-decoration: none; }
 .pilot-feedback-success span { color: white; background: #389b6a; }
 .pilot-feedback-error { color: #9a3b45; border: 1px solid #f2c5ca; background: #fff0f1; }
 .pilot-feedback-error span { color: white; background: #d8616d; }
+.pilot-feedback-warning { color: #826220; border: 1px solid #ead9a4; background: #fff8e6; }
+.pilot-feedback-warning span { color: white; background: #bd963c; }
 .pilot-panel { padding: 38px; border: 1px solid #e6e4ef; border-radius: 24px; background: #fff; box-shadow: 0 22px 55px #3c375b0a; }
 .pilot-panel h2, .pilot-side-note h2 { margin: 15px 0 11px; font-size: 30px; line-height: 1.13; letter-spacing: -.055em; }
 .pilot-panel > p, .pilot-side-note p { color: #85879a; font-size: 13px; line-height: 1.7; }
@@ -103,6 +105,34 @@ a { color: inherit; text-decoration: none; }
 .pilot-metrics small { color: #a1a0b1; font-size: 10px; }
 .pilot-metrics > div:first-child small { color: #c1bfd1; }
 .pilot-admin-grid { display: grid; grid-template-columns: minmax(315px,.8fr) minmax(0,1.2fr); align-items: start; gap: 18px; }
+.pilot-applications-card { margin-bottom: 18px; }
+.pilot-applications-card .pilot-roster-heading p { max-width: 620px; margin: 6px 0 0; }
+.pilot-applications-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 20px; max-height: 610px; overflow: auto; }
+.pilot-application { min-width: 0; padding: 21px; border: 1px solid #e8e5f1; border-radius: 16px; background: #fbfaff; }
+.pilot-application-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pilot-application-head strong, .pilot-application-head span:not(.pilot-status) { display: block; overflow-wrap: anywhere; }
+.pilot-application-head strong { font-size: 14px; }
+.pilot-application-head span:not(.pilot-status) { margin-top: 3px; color: #9291a5; font-size: 11px; }
+.pilot-status { flex: none; padding: 6px 8px; border-radius: 7px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.pilot-status-pending { background: #e5f5ec; color: #398464; }
+.pilot-status-approved { background: #eae8f9; color: #6657b4; }
+.pilot-status-rejected { background: #f6e9e9; color: #ad666b; }
+.pilot-status-approving { background: #fff2d8; color: #9a772e; }
+.pilot-application-meta { margin: 16px 0 8px; color: #655aaf; font-size: 11px; font-weight: 800; }
+.pilot-application-meta span { margin: 0 5px; color: #b3add3; }
+.pilot-application-purpose { min-height: 45px; margin: 0; color: #73768b; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.pilot-application-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 17px; padding-top: 15px; border-top: 1px solid #eae8f2; }
+.pilot-application-foot small { color: #a3a2b0; font-size: 10px; }
+.pilot-review-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.pilot-review-actions button, .pilot-person-actions button { border-radius: 8px; padding: 8px 10px; font: 800 10px Manrope,Arial,sans-serif; cursor: pointer; }
+.pilot-review-actions button:disabled, .pilot-person-actions button:disabled { opacity: .5; cursor: wait; }
+.pilot-review-approve { border: 1px solid #6156b5; background: #6156b5; color: #fff; }
+.pilot-review-approve:hover { background: #493f99; }
+.pilot-review-danger { border: 1px solid #e4b3b9; background: #fff0f0; color: #a3404c; }
+.pilot-review-danger:hover { background: #fbe4e5; }
+.pilot-review-cancel { border: 1px solid #e0ddeb; background: #fff; color: #77748e; }
+.pilot-review-cancel:hover { color: #5248a3; border-color: #aca5d9; }
+.pilot-review-warning { color: #987838; font-size: 10px; line-height: 1.5; }
 .pilot-invite-card > p { max-width: 430px; }
 .pilot-small-print { margin: 22px 0 0; padding-top: 20px; border-top: 1px solid #edebf4; font-size: 10px !important; }
 .pilot-roster-heading { display: flex; justify-content: space-between; align-items: end; gap: 15px; }
@@ -110,7 +140,7 @@ a { color: inherit; text-decoration: none; }
 .pilot-search { display: flex; align-items: center; gap: 10px; margin: 20px 0 11px; color: #9a94bc; }
 .pilot-search input { padding: 13px 14px; }
 .pilot-list { max-height: 540px; overflow: auto; }
-.pilot-person { display: flex; align-items: flex-start; gap: 13px; padding: 19px 2px; border-top: 1px solid #f0eef5; }
+.pilot-person { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 13px; padding: 19px 2px; border-top: 1px solid #f0eef5; }
 .pilot-person-avatar { width: 37px; height: 37px; flex: none; display: grid; place-items: center; border-radius: 11px; color: #5f54aa; background: #ebe7fb; font-size: 14px; font-weight: 800; }
 .pilot-person-info { min-width: 0; flex: 1; }
 .pilot-person-info strong, .pilot-person-info span, .pilot-person-info small { display: block; overflow-wrap: anywhere; }
@@ -119,7 +149,10 @@ a { color: inherit; text-decoration: none; }
 .pilot-person-info small { color: #6eab87; font-size: 9px; font-weight: 800; margin-top: 6px; }
 .pilot-person.is-pending .pilot-person-info small { color: #ab9d69; }
 .pilot-person-info p { color: #a0a0ae; font-size: 10px; line-height: 1.5; margin: 7px 0 0; }
+.pilot-person.is-revoked .pilot-person-info small { color: #a3404c; }
+.pilot-person.is-revoked .pilot-person-avatar { background: #f4e8ea; color: #9d6570; }
 .pilot-person-usage { text-align: right; flex: none; min-width: 92px; }
+.pilot-person-actions { display: flex; gap: 7px; flex-wrap: wrap; flex: 1 0 calc(100% - 50px); margin-left: 50px; }
 .pilot-person-usage b, .pilot-person-usage span { display: block; }
 .pilot-person-usage b { color: #544a9d; font-size: 13px; }
 .pilot-person-usage span { margin-top: 2px; color: #a7a7b4; font-size: 9px; }
@@ -153,6 +186,7 @@ a { color: inherit; text-decoration: none; }
   .pilot-visual-card { bottom: 62px; }
   .pilot-access-steps { margin-top: 45px; }
   .pilot-profile-layout, .pilot-account-grid, .pilot-admin-grid { grid-template-columns: 1fr; }
+  .pilot-applications-list { grid-template-columns: 1fr; }
   .pilot-profile-layout { padding: 50px 0 80px; }
   .pilot-account, .pilot-owner { padding: 54px 0 84px; }
   .pilot-account-heading, .pilot-owner-heading { align-items: flex-start; flex-direction: column; }

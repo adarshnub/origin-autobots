@@ -61,6 +61,7 @@ public sealed class AgentTaskRunner(
     private CancellationTokenSource? _run;
     private readonly OwnerResumeGate _ownerResume = new();
     private volatile bool _captureAuthorized;
+    public bool AccessRevoked { get; private set; }
 
     public event Action<AgentProgress>? Progress;
     public event Action<AgentTimelineEntry>? Timeline;
@@ -100,6 +101,7 @@ public sealed class AgentTaskRunner(
 
     public async Task<AgentRunResult> RunAsync(string instruction, AgentRunOptions options, CancellationToken cancellationToken)
     {
+        AccessRevoked = false;
         using var run = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         lock (_gate)
         {
@@ -192,6 +194,8 @@ public sealed class AgentTaskRunner(
                         var envelope = new ActionEnvelope(1, task.TaskId, deviceId, Guid.NewGuid(), adapterObservationId,
                             lease.LeaseId, lease.Epoch, actionSequence, action);
                         stage = "calendar_adapter_authorizing";
+                        var adapterAccessToken = await login.GetAccessTokenAsync(token).ConfigureAwait(false);
+                        await api.GetPilotAccessAsync(adapterAccessToken, token).ConfigureAwait(false);
                         if (!supervisor.TryAuthorizeTaskAction(lease, envelope, observed, DateTimeOffset.UtcNow, out var authorization, out var rejection) || authorization is null)
                             return (adapterActions, $"The local supervisor blocked Calendar field entry: {rejection}");
                         var label = $"Calendar adapter: {part} {fieldName.ToLowerInvariant()}";
@@ -412,6 +416,10 @@ public sealed class AgentTaskRunner(
                     continue;
                 }
                 stage = "authorizing";
+                // A model response can finish after the owner's access was revoked. Check the
+                // live grant immediately before issuing a local one-use input capability.
+                var currentAccessToken = await login.GetAccessTokenAsync(token).ConfigureAwait(false);
+                await api.GetPilotAccessAsync(currentAccessToken, token).ConfigureAwait(false);
                 if (!supervisor.TryAuthorizeTaskAction(lease, result.Proposal, frame, DateTimeOffset.UtcNow, out var authorization, out var rejection) || authorization is null)
                 {
                     runLog.Write("rejected", new { sequence, stage, reason = rejection });
@@ -457,6 +465,12 @@ public sealed class AgentTaskRunner(
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             return Finish(AgentOutcome.Stopped, "Stopped. Nothing further will be sent. Steps already completed can't be undone.");
+        }
+        catch (AutobotsApiException error) when (error.Code == "pilot_revoked")
+        {
+            AccessRevoked = true;
+            login.SignOut();
+            return Finish(AgentOutcome.Stopped, error.Message);
         }
         catch (DesktopHandoffRequiredException error)
         {
