@@ -63,6 +63,7 @@ public sealed class ShellWindow : Window
     private bool _signingIn;
     private bool _quitting;
     private bool _trayNoticeShown;
+    private bool _servicesInitialized;
     private string _stopHotkey = "Ctrl+Alt+Shift+S";
     private string _talkHotkey = "Ctrl+Alt+Space";
 
@@ -161,19 +162,34 @@ public sealed class ShellWindow : Window
         AutomationProperties.SetName(settingsButton, "Settings");
         settingsButton.Click += (_, _) => ToggleSettings(true);
 
+        var usageButton = Ui.Skin(new Button
+        {
+            Content = "Usage & costs", Padding = new Thickness(12, 6),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsEnabled = _api is not null
+        }, Ui.ButtonKind.Subtle);
+        AutomationProperties.SetName(usageButton, "Usage and costs");
+        usageButton.Click += async (_, _) =>
+        {
+            if (_api is null || _login is null || !await SignInAsync()) return;
+            await new UsageWindow(_api, _login).ShowDialog(this);
+        };
+
         var titleBar = new Grid
         {
             Height = 56,
-            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto,Auto"),
             ColumnSpacing = 10,
             Margin = new Thickness(28, 0, 20, 0)
         };
         Grid.SetColumn(logo, 0);
         Grid.SetColumn(titleText, 1);
-        Grid.SetColumn(_accountButton, 3);
-        Grid.SetColumn(settingsButton, 4);
+        Grid.SetColumn(usageButton, 3);
+        Grid.SetColumn(_accountButton, 4);
+        Grid.SetColumn(settingsButton, 5);
         titleBar.Children.Add(logo);
         titleBar.Children.Add(titleText);
+        titleBar.Children.Add(usageButton);
         titleBar.Children.Add(_accountButton);
         titleBar.Children.Add(settingsButton);
 
@@ -470,6 +486,11 @@ public sealed class ShellWindow : Window
         if (TryGetPlatformHandle()?.Handle is { } handle)
             NativeWindowTraits.UseDarkFrame(handle);
         _greeting.Text = Greeting();
+        // Avalonia raises Opened again after Hide/Show. Shortcuts belong to the app lifetime;
+        // registering them twice produces a false collision warning when returning from a task.
+        if (_servicesInitialized)
+            return;
+        _servicesInitialized = true;
         if (Program.UiPreview is { } preview)
         {
             ShowUiPreview(preview);
@@ -676,9 +697,11 @@ public sealed class ShellWindow : Window
         AddRunHeader(instruction);
         SetRunningUi();
 
-        // Hand the desktop back to the app the owner was using; Autobots works from the pilot bar.
-        if (IsVisible && WindowState != WindowState.Minimized)
-            WindowState = WindowState.Minimized;
+        // Keep the composer out of Alt+Tab while the task uses other applications. Merely minimizing
+        // it leaves it in the switcher, where a model's Alt+Tab can select it and trigger a self-window handoff.
+        // The non-activating pilot and global STOP remain available; the tray can reopen the composer.
+        if (IsVisible)
+            Hide();
         _hud.ShowWorking("Getting ready", "Connecting to your Autobots service…", 0, options.MaxSteps, spinning: true);
 
         AgentRunResult result;

@@ -106,6 +106,11 @@ public sealed class AgentTaskRunner(
         var executed = 0;
         var cost = 0m;
         Guid? taskId = null;
+        using var runLog = new AgentRunLog(Environment.GetEnvironmentVariable("AUTOBOTS_TASK_LOG_DIRECTORY"));
+        var stage = "starting";
+        runLog.Write("started", new { options.MaxSteps, maxSeconds = options.MaxDuration.TotalSeconds });
+        void RecordPointerTarget(PointerTargetDiagnostic diagnostic) => runLog.Write("pointer_target", diagnostic);
+        desktop.PointerTargetObserved += RecordPointerTarget;
         try
         {
             Report(AgentPhase.Starting, 0, options.MaxSteps, "Getting ready", "Connecting to your Autobots service…", null);
@@ -137,11 +142,13 @@ public sealed class AgentTaskRunner(
                     return Finish(AgentOutcome.Failed, "Autobots made too many attempts without progress, so it stopped. Try describing the task differently.");
 
                 Report(AgentPhase.Settling, executed + 1, options.MaxSteps, "Waiting for the screen", "Letting the app finish updating…", null);
+                stage = "settling";
                 await desktop.WaitForVisualSettleAsync(settle.Minimum, settle.Maximum, token).ConfigureAwait(false);
 
                 Report(AgentPhase.Observing, executed + 1, options.MaxSteps, "Looking at your screen", "Taking a fresh screenshot…", null);
                 pointerOverlay?.SetActivity(PointerActivity.Thinking);
                 pointerOverlay?.SetCaption("Looking at the screen…");
+                stage = "observing";
                 var frame = await desktop.CapturePrimaryDisplayAsync(token).ConfigureAwait(false);
                 if (!Guid.TryParse(frame.ObservationId, out var observationId) || !supervisor.TrySetObservation(lease, observationId))
                     throw new InvalidOperationException("The local supervisor could not accept this screen observation.");
@@ -151,6 +158,8 @@ public sealed class AgentTaskRunner(
                 pointerOverlay?.SetCaption("Deciding the next step…");
                 accessToken = await login.GetAccessTokenAsync(token).ConfigureAwait(false);
                 AutobotsApiClient.ActionProposalResponse result;
+                stage = "proposing";
+                runLog.Write("observation", new { sequence, frame.ImageWidth, frame.ImageHeight, app = frame.ForegroundProcessName });
                 try
                 {
                     result = await api.ProposeActionAsync(
@@ -159,6 +168,7 @@ public sealed class AgentTaskRunner(
                 }
                 catch (AutobotsApiException error) when (error.Code == "proposal_unavailable")
                 {
+                    runLog.Write("rejected", new { sequence, stage, reason = error.Reason });
                     if (++consecutiveRejections > MaxConsecutiveRejections)
                         return Finish(AgentOutcome.Failed, "The AI kept suggesting actions Autobots can't perform, so it stopped. Try rephrasing the task.");
                     history.Add(new StepHistoryEntry(sequence, "unusable suggestion", "rejected", error.Reason ?? "not a supported desktop action"));
@@ -171,6 +181,10 @@ public sealed class AgentTaskRunner(
                     throw new InvalidOperationException("The service returned an unexpected execution state, so Autobots stopped.");
                 if (decimal.TryParse(result.ActualCostUsd, NumberStyles.Number, CultureInfo.InvariantCulture, out var stepCost))
                     cost += stepCost;
+                runLog.Write("proposal", new { sequence, result.Status, action = result.Proposal?.Action.GetType().Name,
+                    key = (result.Proposal?.Action as KeyPressAction)?.Key,
+                    x = (result.Proposal?.Action as ClickAction)?.X, y = (result.Proposal?.Action as ClickAction)?.Y,
+                    textLength = (result.Proposal?.Action as TypeTextAction)?.Text.Length, costUsd = stepCost });
 
                 if (result.Status is "completed" or "needs_input" && result.Proposal is null)
                 {
@@ -183,8 +197,10 @@ public sealed class AgentTaskRunner(
                     throw new InvalidOperationException("The service returned an unsupported task step.");
 
                 var action = result.Proposal.Action;
+                stage = "authorizing";
                 if (!supervisor.TryAuthorizeTaskAction(lease, result.Proposal, frame, DateTimeOffset.UtcNow, out var authorization, out var rejection) || authorization is null)
                 {
+                    runLog.Write("rejected", new { sequence, stage, reason = rejection });
                     if (++consecutiveRejections > MaxConsecutiveRejections)
                         return Finish(AgentOutcome.Failed, $"The local supervisor rejected repeated actions: {rejection}");
                     history.Add(new StepHistoryEntry(sequence, ActionNarration.ForHistory(action, result.Intent), "rejected", rejection));
@@ -200,10 +216,12 @@ public sealed class AgentTaskRunner(
                 pointerOverlay?.SetCaption(result.Intent ?? headline);
                 try
                 {
+                    stage = "executing";
                     await desktop.ExecuteAuthorizedActionAsync(authorization, frame, token).ConfigureAwait(false);
                 }
                 catch (ActionNotDispatchedException error)
                 {
+                    runLog.Write("rejected", new { sequence, stage, reason = error.Message });
                     if (++consecutiveRejections > MaxConsecutiveRejections)
                         return Finish(AgentOutcome.Failed, error.Message);
                     history.Add(new StepHistoryEntry(sequence, ActionNarration.ForHistory(action, result.Intent), "rejected", ActionNarration.Clip(error.Message, 280)));
@@ -213,6 +231,7 @@ public sealed class AgentTaskRunner(
                 }
 
                 executed++;
+                runLog.Write("executed", new { sequence, step = executed, action = action.GetType().Name });
                 consecutiveRejections = 0;
                 history.Add(new StepHistoryEntry(sequence, ActionNarration.ForHistory(action, result.Intent), "executed", null));
                 Emit(executed, ActionNarration.Glyph(action), ActionNarration.PastTense(action), detail, TimelineTone.Neutral);
@@ -237,6 +256,7 @@ public sealed class AgentTaskRunner(
         }
         finally
         {
+            desktop.PointerTargetObserved -= RecordPointerTarget;
             _captureAuthorized = false;
             supervisor.Stop();
             try
@@ -257,6 +277,7 @@ public sealed class AgentTaskRunner(
 
         AgentRunResult Finish(AgentOutcome outcome, string message)
         {
+            runLog.Write("finished", new { outcome = outcome.ToString(), stage, steps = executed, costUsd = cost, seconds = clock.Elapsed.TotalSeconds, message });
             var tone = outcome switch
             {
                 AgentOutcome.Completed => TimelineTone.Success,

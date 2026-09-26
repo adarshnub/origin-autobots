@@ -48,6 +48,7 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
     private int _armed;
 
     public bool IsArmed => Volatile.Read(ref _armed) != 0;
+    public event Action<PointerTargetDiagnostic>? PointerTargetObserved;
 
     /// <summary>Scales pointer travel time: 0.5 is brisk, 1 is the default, 1.6 is slow and easy to follow.</summary>
     public double PointerSpeed { get; set; } = 1.0;
@@ -274,6 +275,24 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
             }
         }
         SendPointerMove(target.X, target.Y, dispatch);
+        // SendInput acknowledges queuing. Measure the actual physical cursor before pressing a
+        // button so clipped movement, scaling errors or pointer interference cannot become a click.
+        var arrived = false;
+        NativePoint actual = default;
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            dispatch.Check(force: true);
+            if (GetCursorPos(out actual) && Math.Abs(actual.X - target.X) <= 2 && Math.Abs(actual.Y - target.Y) <= 2)
+            {
+                arrived = true;
+                break;
+            }
+            Thread.Sleep(10);
+        }
+        PointerTargetObserved?.Invoke(new PointerTargetDiagnostic(dispatch.Authorization.Envelope.Sequence,
+            target.X, target.Y, actual.X, actual.Y));
+        if (!arrived)
+            throw dispatch.Fail("The pointer did not reach the observed target. No click was sent; observe again.");
     }
 
     private void TypeText(string text, ActionDispatch dispatch)
@@ -495,6 +514,7 @@ public sealed class WindowsInputController(IAgentPointerOverlay? pointerOverlay 
         var inputs = new[] { AbsoluteMove(x, y, observation) };
         lock (_inputGate)
         {
+            dispatch.CancellationToken.ThrowIfCancellationRequested();
             if (SendInput(1, inputs, Marshal.SizeOf<Input>()) != 1)
                 throw dispatch.Fail("Windows rejected the pointer movement.");
         }

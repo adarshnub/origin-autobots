@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import os
+import time
 from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal
@@ -23,11 +24,12 @@ from services.api.app.google_provider import (
 from services.api.app.persistent_budget import SQLiteBudgetLedger
 from services.api.app.speech import GeminiTranscriber, InvalidAudio, inspect_wave
 from services.api.app.storage import IdempotencyConflict, SQLiteTaskStore, StoredTask
+from services.api.app.usage import UsageStore, aws_billing
 
 
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 # Advertised so the desktop client can detect an older deployed API and omit newer request fields.
-API_FEATURES = ("step-history", "desktop-actions-v2", "transcription")
+API_FEATURES = ("step-history", "desktop-actions-v2", "transcription", "usage-reporting")
 
 app = FastAPI(
     title="Autobots by Origin Studios API",
@@ -260,6 +262,8 @@ async def propose_action(
     except BudgetExceeded as error:
         raise HTTPException(status_code=429, detail={"code": "model_budget_exhausted"}) from error
 
+    usage = UsageStore(store.path)
+    request_started = time.perf_counter()
     try:
         provider = _live_provider()
         result = await provider.propose_action(
@@ -276,29 +280,37 @@ async def propose_action(
             foreground_title=request.foreground_title,
         )
     except OwnerConfirmationRequired as error:
+        usage.record(reservation, principal.subject, "desktop", "confirmation_required", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         store.record_event(principal.subject, task_id, "provider_confirmation_required", {"epoch": request.epoch, "sequence": request.sequence})
         raise HTTPException(status_code=409, detail={"code": "owner_confirmation_required"}) from error
     except ProposalUnavailable as error:
+        usage.record(reservation, principal.subject, "desktop", "rejected", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         store.record_event(principal.subject, task_id, "proposal_rejected", {"epoch": request.epoch, "sequence": request.sequence})
         raise HTTPException(status_code=422, detail={"code": "proposal_unavailable", "reason": _safe_reason(error)}) from error
     except HTTPException:
+        usage.record(reservation, principal.subject, "desktop", "unavailable", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         raise
     except Exception as error:
+        usage.record(reservation, principal.subject, "desktop", "provider_error", request_started)
         if reservation:
             budget_ledger.reconcile(reservation, Decimal("0.01"))
         store.record_event(principal.subject, task_id, "provider_error", {"epoch": request.epoch, "sequence": request.sequence})
         raise HTTPException(status_code=502, detail={"code": "model_provider_error"}) from error
 
+    usage.record(reservation, principal.subject, "desktop", "response", request_started, result)
     if reservation:
         budget_ledger.reconcile(reservation, result.cost_usd)
     latest_task = store.get_task(principal.subject, task_id)
-    if latest_task is None or latest_task.status not in {"queued", "active"} or latest_task.epoch != request.epoch:
+    # The device's lease epoch spans multiple tasks; a new server task starts at epoch zero.
+    # Detect cloud STOP against the server snapshot taken before inference, while preserving the
+    # caller's local epoch in the proposal for the authoritative local supervisor to validate.
+    if latest_task is None or latest_task.status not in {"queued", "active"} or latest_task.epoch != task.epoch:
         store.record_event(principal.subject, task_id, "proposal_discarded_after_stop", {"epoch": request.epoch, "sequence": request.sequence})
         raise HTTPException(status_code=409, detail={"code": "task_stopped_while_model_was_running"})
     completed = bool(getattr(result, "completed", False))
@@ -374,6 +386,8 @@ async def transcribe_voice_instruction(
         reservation = speech_ledger.reserve(uuid4(), _SPEECH_RESERVATION_USD)
     except BudgetExceeded as error:
         raise HTTPException(status_code=429, detail={"code": "speech_budget_exhausted"}) from error
+    usage = UsageStore(store.path)
+    request_started = time.perf_counter()
     try:
         result = await _live_transcriber().transcribe(
             audio_bytes=audio,
@@ -382,12 +396,15 @@ async def transcribe_voice_instruction(
         )
     except HTTPException:
         # Configuration errors are raised before any provider request, so nothing was spent.
+        usage.record(reservation, principal.subject, "speech", "unavailable", request_started)
         speech_ledger.release(reservation)
         raise
     except Exception as error:
         # The provider may have billed a failed request; keep the conservative reservation.
+        usage.record(reservation, principal.subject, "speech", "provider_error", request_started)
         speech_ledger.reconcile(reservation, _SPEECH_RESERVATION_USD)
         raise HTTPException(status_code=502, detail={"code": "transcription_provider_error"}) from error
+    usage.record(reservation, principal.subject, "speech", "transcribed" if result.transcript else "no_speech", request_started, result)
     speech_ledger.reconcile(reservation, result.cost_usd)
     return TranscriptionResponse(
         status="transcribed" if result.transcript else "no_speech",
@@ -398,6 +415,18 @@ async def transcribe_voice_instruction(
         output_tokens=result.output_tokens,
         actual_cost_usd=str(result.cost_usd),
     )
+
+
+@app.get("/v1/usage", tags=["usage"])
+async def usage_summary(principal: Annotated[OwnerPrincipal, Depends(_current_owner)]) -> dict:
+    report = UsageStore(store.path).summary(principal.subject, budget_ledger, speech_ledger)
+    report["billing"] = [await aws_billing(), {
+        "provider": "gcp", "source": "Cloud Billing export", "scope": "Autobots GCP project",
+        "status": "not_connected", "amount": None, "currency": "USD", "as_of": None,
+        "note": "GCP invoice totals require a configured Cloud Billing export. Gemini request usage is tracked separately above.",
+    }]
+    report["other_apis"] = {"status": "none_configured", "note": "No other billable AI API provider is configured. Google Meet and WhatsApp examples use their websites, not paid API integrations."}
+    return report
 
 
 def _safe_reason(error: Exception) -> str:

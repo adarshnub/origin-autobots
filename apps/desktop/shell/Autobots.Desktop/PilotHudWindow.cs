@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
@@ -366,6 +367,7 @@ public sealed class PilotHudWindow : Window
                 VerticalAlignment = VerticalAlignment.Center,
                 Focusable = false
             }, kind);
+            AutomationProperties.SetName(button, label ?? (icon == Icons.Close ? "Dismiss" : icon == Icons.Edit ? "Edit in Autobots" : "Pilot action"));
             if (label is null)
                 ToolTip.SetTip(button, icon == Icons.Close ? "Dismiss" : icon == Icons.Edit ? "Edit in Autobots" : null);
             button.Click += (_, _) => onClick();

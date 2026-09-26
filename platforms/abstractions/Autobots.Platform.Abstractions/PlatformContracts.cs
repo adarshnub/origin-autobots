@@ -96,9 +96,12 @@ public interface IInputController
 /// </summary>
 public interface IDesktopAutomation : IPlatformAutomation, IInputController
 {
+    event Action<PointerTargetDiagnostic>? PointerTargetObserved;
     double PointerSpeed { get; set; }
     ValueTask WaitForVisualSettleAsync(TimeSpan minimum, TimeSpan maximum, CancellationToken cancellationToken);
 }
+
+public sealed record PointerTargetDiagnostic(long Sequence, int TargetX, int TargetY, int ActualX, int ActualY);
 
 /// <summary>An OS-wide shortcut registered by the signed-in user's Autobots process.</summary>
 public interface IGlobalShortcut : IAsyncDisposable

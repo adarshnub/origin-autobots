@@ -65,6 +65,11 @@ public sealed class WindowsDesktopAdapter(
     private static extern bool StretchBlt(nint destination, int x, int y, int width, int height, nint source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, uint operation);
 
     public bool IsArmed => _inputController.IsArmed;
+    public event Action<PointerTargetDiagnostic>? PointerTargetObserved
+    {
+        add => _inputController.PointerTargetObserved += value;
+        remove => _inputController.PointerTargetObserved -= value;
+    }
 
     /// <summary>Pointer travel speed multiplier; see <see cref="WindowsInputController.PointerSpeed"/>.</summary>
     public double PointerSpeed

@@ -16,6 +16,7 @@
     <ProjectReference Include="../../../../platforms/abstractions/Autobots.Platform.Abstractions/Autobots.Platform.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../../shell/Autobots.Desktop/AgentRunLog.cs" Link="AgentRunLog.cs" />
     <Content Include="../../../../packages/contracts/fixtures/action-click.v1.json" Link="action-click.v1.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../../packages/contracts/fixtures/action-drag.v1.json" Link="action-drag.v1.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../../packages/contracts/fixtures/action-type-enter.v1.json" Link="action-type-enter.v1.json" CopyToOutputDirectory="PreserveNewest" />

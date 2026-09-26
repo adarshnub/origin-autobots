@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 import base64
+import pytest
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
@@ -13,6 +14,55 @@ from packages.contracts.generated.python.action import ActionEnvelope, ClickActi
 
 
 client = TestClient(main.app)
+
+
+@pytest.mark.parametrize("stop_during_request", [False, True])
+def test_successive_tasks_keep_local_epoch_and_discard_cloud_stop(monkeypatch, tmp_path, stop_during_request):
+    """A device epoch spans tasks; the independent server task epoch starts at zero for each task."""
+    owner = OwnerPrincipal(subject="epoch-test-owner", username="owner")
+    task_store = SQLiteTaskStore(tmp_path / "epochs.db")
+    monkeypatch.setattr(main, "store", task_store)
+    monkeypatch.setattr(main, "budget_ledger", SQLiteBudgetLedger(
+        task_store.path, BudgetLimits(Decimal("1"), Decimal("5"), Decimal("50"))))
+    monkeypatch.setenv("AUTOBOTS_LIVE_AI_ENABLED", "true")
+    main.app.dependency_overrides[main._current_owner] = lambda: owner
+    device_id = uuid4()
+    task_store.enroll_device(owner.subject, device_id, "Synthetic desktop", "windows")
+
+    class FakeProvider:
+        async def propose_action(self, **kwargs):
+            if stop_during_request:
+                task_store.stop_task(owner.subject, kwargs["task_id"])
+            return SimpleNamespace(
+                envelope=ActionEnvelope(schema_version=1, task_id=kwargs["task_id"],
+                    device_id=device_id, action_id=uuid4(), observation_id=kwargs["observation_id"],
+                    lease_id=kwargs["lease_id"], epoch=kwargs["epoch"], sequence=kwargs["sequence"],
+                    action=ClickAction(kind="click", x=500, y=500, button="left")),
+                model_id="fake", input_tokens=10, output_tokens=1, cost_usd=Decimal("0.000001"))
+
+    monkeypatch.setattr(main, "_live_provider", FakeProvider)
+    try:
+        for local_epoch in (0, 1, 7):
+            task, _ = task_store.create_task(owner.subject, device_id, "Synthetic long workflow", str(uuid4()))
+            lease_id = uuid4()
+            for sequence in range(1, 41 if not stop_during_request else 2):
+                response = client.post(f"/v1/tasks/{task.task_id}/proposals", json={
+                    "device_id": str(device_id), "observation_id": str(uuid4()),
+                    "lease_id": str(lease_id), "epoch": local_epoch, "sequence": sequence,
+                    "image_mime_type": "image/png",
+                    "image_base64": base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 32).decode("ascii"),
+                })
+                if stop_during_request:
+                    assert response.status_code == 409
+                    assert response.json()["detail"]["code"] == "task_stopped_while_model_was_running"
+                else:
+                    assert response.status_code == 200, response.json()
+                    assert response.json()["proposal"]["epoch"] == local_epoch
+                    assert response.json()["proposal"]["sequence"] == sequence
+                    assert response.json()["execution"] == "not_executed"
+            task_store.stop_task(owner.subject, task.task_id)
+    finally:
+        main.app.dependency_overrides.clear()
 
 
 def test_health_is_available_without_cloud_credentials() -> None:

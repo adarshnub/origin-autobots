@@ -29,6 +29,7 @@ public sealed record KeyChord(KeyModifiers Modifiers, string Key)
         ["alt"] = KeyModifiers.Alt, ["option"] = KeyModifiers.Alt, ["opt"] = KeyModifiers.Alt, ["lalt"] = KeyModifiers.Alt,
         ["ralt"] = KeyModifiers.Alt, ["altleft"] = KeyModifiers.Alt, ["altright"] = KeyModifiers.Alt,
         ["meta"] = KeyModifiers.Meta, ["win"] = KeyModifiers.Meta, ["windows"] = KeyModifiers.Meta, ["super"] = KeyModifiers.Meta,
+        ["superl"] = KeyModifiers.Meta, ["superr"] = KeyModifiers.Meta,
         ["os"] = KeyModifiers.Meta, ["lwin"] = KeyModifiers.Meta, ["rwin"] = KeyModifiers.Meta, ["metaleft"] = KeyModifiers.Meta,
         ["metaright"] = KeyModifiers.Meta, ["start"] = KeyModifiers.Meta, ["windowskey"] = KeyModifiers.Meta
     };

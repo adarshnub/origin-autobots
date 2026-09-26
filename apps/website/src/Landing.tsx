@@ -1,6 +1,7 @@
 import { BotsScene, useFlight } from "./BotsScene";
 import { Header, Footer, Icon, LINKEDIN } from "./ui";
 import { AppPreview, TaskWalkthrough, PilotPreview, BotFormationControls } from "./TaskWalkthrough";
+import { UseCases } from "./UseCases";
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL as string | undefined;
 
@@ -27,6 +28,8 @@ export default function Landing() {
       <div className="section-heading"><span className="eyebrow">ONE REQUEST. A FEW LITTLE MOVES.</span><h2>Say it once.<br /><span>Watch the plan come together.</span></h2><p>“Create a Google Calendar meeting for Tuesday at 3 PM,<br className="desktop-break" /> and send the Meet link to Amal TGH on WhatsApp.”</p></div>
       <TaskWalkthrough />
     </section>
+
+    <UseCases />
 
     <section className="section how-section" id="how" data-flight-section><div className="how-layout"><div className="how-copy"><span className="eyebrow">GET INTO YOUR FLOW</span><h2>One task.<br /><span>A little magic.</span></h2><p>No elaborate workflow to draw. Just a clear goal and a view of what happens next.</p><div className="pilot-display"><div className="pilot-display-label"><span className="status-dot" /> YOUR CO-PILOT, ALWAYS IN REACH</div><PilotPreview /><small>Floating pilot · interface preview</small></div></div><ol className="how-steps"><li><span>01</span><div><h3>Make yourself at home.</h3><p>Extract your Windows pilot ZIP, open Autobots, and connect your owner account.</p></div></li><li><span>02</span><div><h3>Give it something to do.</h3><p>Press Ctrl + Alt + Space to speak, or type your task. Review the voice transcript before the run begins.</p></div></li><li><span>03</span><div><h3>Follow the little moves.</h3><p>Autobots observes, acts, and looks again. The floating pilot stays nearby while each step appears in the activity feed.</p></div></li><li><span>04</span><div><h3>Stop whenever you want.</h3><p>Use the pilot bar or Ctrl + Alt + Shift + S. Stopping prevents future input; completed actions stay completed.</p></div></li></ol></div></section>
 

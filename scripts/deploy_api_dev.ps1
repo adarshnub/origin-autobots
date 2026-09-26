@@ -37,6 +37,13 @@ unzip -oq "$stage/api.zip" -d "$stage/source"
 systemctl stop autobots-api
 cp -a "$stage/source/." /opt/autobots/source/
 chown -R autobots:autobots /opt/autobots/source
+install -d -m 0755 /etc/systemd/system/autobots-api.service.d
+cat >/etc/systemd/system/autobots-api.service.d/usage.conf <<'USAGE_CONFIG'
+[Service]
+Environment=AUTOBOTS_AWS_ACCOUNT_ID=@@ACCOUNT@@
+Environment=AUTOBOTS_AWS_BUDGET_NAME=autobots-dev-monthly-account-alert
+USAGE_CONFIG
+systemctl daemon-reload
 if systemctl start autobots-api; then
   for attempt in $(seq 1 20); do
     if curl --fail --silent http://127.0.0.1:8765/healthz >/dev/null 2>&1; then
@@ -57,7 +64,7 @@ for attempt in $(seq 1 20); do
 done
 exit 1
 '@
-$remoteCommand = $remoteCommand.Replace("@@BUCKET@@", $bucket).Replace("@@REGION@@", $region)
+$remoteCommand = $remoteCommand.Replace("@@BUCKET@@", $bucket).Replace("@@REGION@@", $region).Replace("@@ACCOUNT@@", $expectedAccount)
 
 $request = @{
     DocumentName = "AWS-RunShellScript"

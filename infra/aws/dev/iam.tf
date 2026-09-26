@@ -16,6 +16,20 @@ resource "aws_iam_instance_profile" "api" {
   role = aws_iam_role.api.name
 }
 
+# Read the existing budget only. No cost queries, budget edits or unrelated services.
+resource "aws_iam_role_policy" "api_usage" {
+  name = "autobots-dev-usage-read"
+  role = aws_iam_role.api.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["budgets:ViewBudget"]
+      Resource = "arn:aws:budgets::${data.aws_caller_identity.current.account_id}:budget/${aws_budgets_budget.monthly_account.name}"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "ssm" {
   role       = aws_iam_role.api.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

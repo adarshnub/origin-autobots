@@ -75,6 +75,9 @@ public sealed class AutobotsApiClient(HttpClient httpClient, DesktopConfiguratio
     public Task<TaskResponse> StopTaskAsync(string accessToken, Guid taskId, CancellationToken cancellationToken) =>
         SendJsonAsync<TaskResponse>(HttpMethod.Post, $"/v1/tasks/{taskId:D}/stop", accessToken, null, cancellationToken);
 
+    public Task<JsonElement> GetUsageAsync(string accessToken, CancellationToken cancellationToken) =>
+        SendJsonAsync<JsonElement>(HttpMethod.Get, "/v1/usage", accessToken, null, cancellationToken);
+
     public async Task<ActionProposalResponse> ProposeActionAsync(
         string accessToken,
         Guid taskId,

@@ -10,6 +10,8 @@ public sealed class KeyChordTests
     [InlineData("ctrl + shift + t", KeyModifiers.Control | KeyModifiers.Shift, "t")]
     [InlineData("Meta", KeyModifiers.None, "Meta")]
     [InlineData("win", KeyModifiers.None, "Meta")]
+    [InlineData("Super_L", KeyModifiers.None, "Meta")]
+    [InlineData("Super_R+e", KeyModifiers.Meta, "e")]
     [InlineData("Windows+R", KeyModifiers.Meta, "r")]
     [InlineData("Alt+Tab", KeyModifiers.Alt, "Tab")]
     [InlineData("Enter", KeyModifiers.None, "Enter")]
@@ -94,5 +96,22 @@ public sealed class KeyChordTests
     public void ObservationImagesFitTheModelResolutionWithoutDistortion(int width, int height, int expectedWidth, int expectedHeight)
     {
         Assert.Equal((expectedWidth, expectedHeight), DisplayCoordinateTransform.FitWithin(width, height, 1440, 900));
+    }
+
+    [Theory]
+    [InlineData(1920, 1080, 0, 0)]
+    [InlineData(2560, 1440, -2560, 0)]
+    [InlineData(3840, 2160, 1920, -2160)]
+    [InlineData(1080, 1920, -1080, -800)]
+    public void PointerMappingUsesPhysicalPixelsAcrossDisplaySizesAndOrigins(int width, int height, int originX, int originY)
+    {
+        // Pure math only: no native input or monitor reconfiguration.
+        foreach (var x in new[] { 0, 111, 250, 500, 749, 888, 999 })
+        foreach (var y in new[] { 0, 111, 250, 500, 749, 888, 999 })
+        {
+            var point = DisplayCoordinateTransform.ToDesktopPixels(x, y, width, height, originX, originY);
+            Assert.InRange(Math.Abs(point.X - originX - x * (width - 1) / 999d), 0, 0.5);
+            Assert.InRange(Math.Abs(point.Y - originY - y * (height - 1) / 999d), 0, 0.5);
+        }
     }
 }
