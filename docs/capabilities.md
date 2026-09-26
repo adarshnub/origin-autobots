@@ -6,7 +6,7 @@ The fresh Calendar event was created and its copied conference details verified 
 
 Read-only investigation found the WhatsApp desktop UI Automation tree exposes only window chrome (8 descendants), not the chat header or composer. Windows' built-in OCR engine is available and recognized the visible chat header and composer in a local screenshot probe; a guarded native messaging adapter has **not** been implemented or qualified. The app must not infer that an unverified chat or message was sent. No WhatsApp Business API credentials or other independent messaging connector are configured.
 
-A local [reviewed-paste helper](../scripts/whatsapp/README.md) now accepts an owner-supplied UTF-8 message file and recipient label, requires an explicit `PASTE` confirmation and an owner hotkey in the selected WhatsApp Desktop chat, and sends only Ctrl+V. It does not send the message, verify the recipient or integrate with the paused provider proposal. It has not been exercised against the live WhatsApp app. It cannot be automatically invoked to avoid a provider `require_confirmation` decision.
+A local [reviewed-paste helper](../scripts/whatsapp/README.md) accepts an owner-supplied UTF-8 message file and recipient label and requires an explicit `COPY` confirmation before preparing the clipboard. It does not inject desktop input, send the message, verify the recipient or integrate with the paused provider proposal. It has not been exercised against the live WhatsApp app. It cannot be automatically invoked to avoid a provider `require_confirmation` decision.
 
 ## Live qualification and usage — 26 September 2026
 
