@@ -127,6 +127,8 @@ The current Windows shell supports Cognito sign-in, typed and spoken task entry,
 
 `apps/website` is an independently buildable landing page with a continuous scroll-responsive 3D scene, a clearly marked illustrative demo, a Windows private-pilot access point, macOS/Linux roadmap cards and a separate developer page. Public signup and analytics remain disabled. A direct Windows download requires a separately approved public release artifact and configured URL.
 
+The public website uses `https://autobots.origin-studio.in` on the existing AWS CloudFront distribution. Manage its HTTPS certificate and hostname through the isolated `infra/aws/website` Terraform root; DNS remains in GoDaddy. Preserve the existing `origin-studio.in` root website, `www`, mail records and nameservers. Retain the ACM validation CNAME for renewal. This custom hostname is for the public website only, separate from desktop API and authentication configuration.
+
 ## Milestones
 
 | Milestone | Deliverable | Exit evidence |

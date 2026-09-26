@@ -1,5 +1,9 @@
 # Capability and toolchain findings
 
+## Custom website hostname — 26 September 2026
+
+The owner's existing GoDaddy session exposed the editable DNS zone for `origin-studio.in`. Added only the Autobots CNAME and ACM validation CNAME; the main website's root `A` record, `www` and nameservers remain intact. The existing AWS CLI identity and installed Terraform/provider were sufficient; no dependency installation, registrar API credentials or new AWS keys were needed. ACM in `us-east-1` reported the non-exportable certificate `ISSUED`, and CloudFront `E21MANSPJEWFLG` reported `Deployed` with alias `autobots.origin-studio.in`. The authoritative GoDaddy DNS server returned the expected CloudFront CNAME with TTL 3600. The public address is `https://autobots.origin-studio.in`. No application, HTTP or rendered-page tests were run, and global DNS propagation is not claimed. See [implementation evidence](implementation-status.md) and [domain configuration guide](../infra/aws/website/README.md).
+
 ## Eyes brand and illustrated voice workflow — 26 September 2026
 
 The website now uses the eyes brand mark consistently with native Windows icon resources, and the desktop empty activity view has a shaded helper illustration. The existing WebGL helpers have distinct curved scroll paths, later formations and manual Orbit/V controls. The landing walkthrough is a locally rendered simulation of voice instruction, Google Calendar creation and WhatsApp sharing to the owner-specified contact; no real app workflow is claimed verified. The developer page now lists the role AI Engineer, 16 curated public projects and 10 resume-based professional contributions. Requested exclusions and employer project details are omitted. See [brand and walkthrough notes](website-brand-and-walkthrough.md) and [portfolio sources](developer-project-sources.md). No app/browser tests were run.

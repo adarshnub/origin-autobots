@@ -44,6 +44,7 @@ resource "aws_cloudfront_distribution" "site" {
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
   http_version        = "http2"
+  aliases             = var.custom_domain == "" ? [] : [var.custom_domain]
 
   origin {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
@@ -73,7 +74,9 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.custom_domain == ""
+    acm_certificate_arn            = var.custom_domain == "" ? null : aws_acm_certificate_validation.site[0].certificate_arn
+    ssl_support_method             = var.custom_domain == "" ? null : "sni-only"
     minimum_protocol_version       = "TLSv1.2_2021"
   }
 
