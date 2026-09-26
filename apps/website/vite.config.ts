@@ -10,6 +10,7 @@ export default defineConfig({
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         developer: fileURLToPath(new URL("./developer/index.html", import.meta.url)),
         pilot: fileURLToPath(new URL("./pilot/index.html", import.meta.url)),
+        downloads: fileURLToPath(new URL("./downloads/index.html", import.meta.url)),
       },
     },
   },

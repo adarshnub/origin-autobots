@@ -11,6 +11,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
     play: <path d="m9 5 11 7-11 7Z" />,
     pause: <><path d="M8 5v14M16 5v14" /></>,
     shield: <><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" /><path d="m8 12 3 3 5-6" /></>,
+    search: <><circle cx="10.8" cy="10.8" r="6.7" /><path d="m16 16 4.4 4.4" /></>,
     command: <><rect x="3" y="3" width="18" height="18" rx="5" /><path d="m8 8 4 4-4 4m6 0h3" /></>,
     window: <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18M7 6.5h.01M10 6.5h.01" /></>,
     windows: <><path d="M3 4h8v8H3zm10 0h8v8h-8zM3 14h8v8H3zm10 0h8v8h-8z" fill="currentColor" stroke="none" /></>,
@@ -35,7 +36,7 @@ export function Brand() {
 export function Header({ developer = false }: { developer?: boolean }) {
   const [open,setOpen] = useState(false);
   const prefix = developer ? "/" : "";
-  return <header className="site-header"><Brand /><nav className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation"><a href={`${prefix}#product`} onClick={() => setOpen(false)}>The experience</a><a href={`${prefix}#in-action`} onClick={() => setOpen(false)}>In action</a><a href={`${prefix}#how`} onClick={() => setOpen(false)}>How it works</a><a href="/developer/index.html">The maker <Icon name="diagonal" size={13} /></a><a href="/pilot/index.html">Pilot portal <Icon name="diagonal" size={13} /></a></nav><a className="nav-download" href={`${prefix}#download`}>Get Autobots <Icon name="arrow" size={16} /></a><button className="menu-toggle" type="button" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button></header>;
+  return <header className="site-header"><Brand /><nav className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation"><a href={`${prefix}#product`} onClick={() => setOpen(false)}>The experience</a><a href={`${prefix}#in-action`} onClick={() => setOpen(false)}>In action</a><a href={`${prefix}#how`} onClick={() => setOpen(false)}>How it works</a><a href="/developer/index.html">The maker <Icon name="diagonal" size={13} /></a><a href="/pilot/index.html">Pilot portal <Icon name="diagonal" size={13} /></a></nav><a className="nav-download" href="/downloads/index.html">Get Autobots <Icon name="arrow" size={16} /></a><button className="menu-toggle" type="button" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button></header>;
 }
 
 export function Footer() {

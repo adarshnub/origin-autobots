@@ -49,4 +49,4 @@ $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvar
 Set-Content -LiteralPath "$zipPath.sha256" -Value "$hash  $(Split-Path $zipPath -Leaf)" -Encoding ascii
 Write-Output "Windows bundle: $zipPath"
 Write-Output "SHA-256: $hash"
-Write-Output "Runtime settings were generated from this workspace's AWS Terraform state; keep the bundle private."
+Write-Output "Runtime settings contain public API and Cognito identifiers only. Publish reviewed builds through scripts/publish_windows_release.ps1."

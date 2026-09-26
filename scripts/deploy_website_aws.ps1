@@ -12,6 +12,7 @@ $dist = (Resolve-Path (Join-Path $repo $DistPath)).Path
 if (-not (Test-Path (Join-Path $dist "index.html"))) { throw "Built website index.html is missing." }
 if (-not (Test-Path (Join-Path $dist "developer/index.html"))) { throw "Built developer page is missing." }
 if (-not (Test-Path (Join-Path $dist "pilot/index.html"))) { throw "Built pilot portal is missing." }
+if (-not (Test-Path (Join-Path $dist "downloads/index.html"))) { throw "Built downloads page is missing." }
 if (-not (Test-Path (Join-Path $dist "assets"))) { throw "Built website assets are missing." }
 
 $bucket = & $terraform "-chdir=$tfDir" output -raw origin_bucket
@@ -31,6 +32,8 @@ aws s3 cp (Join-Path $dist "developer/index.html") "s3://$bucket/developer/index
 if ($LASTEXITCODE -ne 0) { throw "Developer page upload failed." }
 aws s3 cp (Join-Path $dist "pilot/index.html") "s3://$bucket/pilot/index.html" --content-type "text/html; charset=utf-8" --cache-control "no-cache,max-age=0" --only-show-errors
 if ($LASTEXITCODE -ne 0) { throw "Pilot portal upload failed." }
+aws s3 cp (Join-Path $dist "downloads/index.html") "s3://$bucket/downloads/index.html" --content-type "text/html; charset=utf-8" --cache-control "no-cache,max-age=0" --only-show-errors
+if ($LASTEXITCODE -ne 0) { throw "Downloads page upload failed." }
 
 aws cloudfront create-invalidation --distribution-id $distribution --paths "/*" --query "Invalidation.{Id:Id,Status:Status}" --output json
 if ($LASTEXITCODE -ne 0) { throw "CloudFront invalidation failed." }

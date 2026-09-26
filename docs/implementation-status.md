@@ -2,6 +2,28 @@
 
 Updated 26 September 2026.
 
+## Latest — pilot portal UX refresh
+
+- **Components:** The public pilot entry page now puts sign-in and LinkedIn invitation actions in the first viewport, explains the three access steps, and uses the Autobots companion illustration. The pilot profile form labels, usage balance, and download path are clearer. The owner view adds a summary, searchable roster, usage bars, inline invitation feedback and a manual usage refresh.
+- **Behavior:** OAuth code exchange and owner-only API authorization are unchanged. The page now shows sign-in errors beside the sign-in action, handles a cancelled Cognito return, and avoids suggesting a second invitation if sending succeeded but the roster refresh failed. No account was invited during this change.
+- **Commands and evidence:** `scripts/build_website_pilot.ps1` completed TypeScript/Vite build (final Vite build: 1.01 seconds). `scripts/deploy_website_aws.ps1` uploaded the four website pages and assets to the existing website bucket. CloudFront invalidation `IBGXT8F6C8EP0DEJ9CAYB8IO2Q` reached Completed. The public entry page was visually reviewed in Chrome at a desktop viewport; both access choices, the companion and the three steps were visible without scrolling.
+- **Checks skipped and limitations:** No automated test suite, authenticated owner/pilot browser session, invitation email, desktop control or mobile visual review was run. Authenticated dashboard presentation and refresh behavior are implemented but not visually verified with a real account.
+- **Cloud resources changed:** Existing website S3 objects and CloudFront cache only; no Terraform apply, API deploy or Cognito changes.
+- **Next task:** Review owner and invited-pilot states with real accounts when available and collect pilot feedback.
+
+## Downloads page refresh
+
+- **Components:** The downloads page now places a latest-version download button in the hero, shows a cursor-reactive 3D bot that smiles and says “Autobots, roll out!” when a download is selected, and links to Adarsh’s LinkedIn for pilot invitations. The pilot sign-in page also links to LinkedIn.
+- **Release publishing:** The public catalog no longer contains SHA-256 fields, and the two public checksum sidecars were removed. Local hash validation and the immutable S3 object metadata remain in the publisher. Versioned ZIPs are still stored in S3 outside Git.
+- **Commands and evidence:** `scripts/build_website_pilot.ps1` completed TypeScript/Vite build; `scripts/publish_windows_release.ps1` rewrote the v0.5.0 catalog without a checksum; `scripts/deploy_website_aws.ps1` uploaded four pages and assets. CloudFront invalidations `I79QCXMABRZJV9VKOBXUJVKG0J`, `I5PXQP2BE4SL0S7C7P6HWU7IN5` and final site invalidation `IB1C6QOUAJX9N53GWKKLKS9I6Y` were requested, with the last one Completed. Public HEAD checks returned 200 for downloads, portal and v0.5.0 ZIP, and 403 for both removed checksum paths. The public catalog returned v0.5.0 with no `sha256` property. The final served downloads bundle contains the hero download, LinkedIn invitation prompt and robot messages, with no checksum label.
+- **Visual review and checks skipped:** The live page was viewed in Chrome at a desktop viewport. The latest-version button, LinkedIn invite link and 3D bot were visible above the fold. No automated test suite, live desktop input, download-click animation check or mobile viewport review was run for this page refresh.
+- **Cloud resources changed:** Existing website S3 bucket objects and CloudFront cache only. No Terraform apply or new infrastructure.
+- **Next task:** Review the 3D layout and download interaction at desktop and mobile sizes and collect feedback from invited pilots.
+
+## Invite-only pilot and versioned downloads
+
+API 0.5.0, the Cognito pilot group, owner-only invite portal and Windows v0.5.0 downloads are deployed. The per-pilot request ledger has a $10 lifetime limit across desktop and speech usage; the owner subject is exempt from that per-user limit. The public downloads page reads version numbers and changelogs from an S3 catalog, and the 113 MB ZIPs live in versioned S3 keys outside the repository. Local release validation still checks SHA-256, while the public catalog and page omit it. Public URLs, anonymous admin rejection, CORS preflight, the website build, 72 Python tests and 90 .NET tests passed. A live Notepad-only run read back the requested 177 characters exactly; the full WhatsApp send was not verified. No pilot invitation was sent because no pilot email was provided. Full commands, measured outcomes and limitations are in [pilot rollout evidence](pilot-rollout-2026-09-26.md). The sections below retain historical status at their original dates.
+
 ## Latest — Calendar qualification, limits and website copy
 
 - The owner raised desktop inference limits to $1/task, $5/UTC day and $100/UTC month. The running AWS API process was checked for those exact values; separate speech limits stayed unchanged. API 0.4.2 was deployed with sanitized provider-error diagnostics and passed its public live health check.

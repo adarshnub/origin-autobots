@@ -1,0 +1,88 @@
+.release-hero {
+  display: flex;
+  align-items: center;
+  min-height: 570px;
+  padding: 55px 0 42px;
+  overflow: visible;
+}
+.release-hero-copy { position: relative; z-index: 2; max-width: 610px; }
+.release-hero h1 { margin: 21px 0 16px; }
+.release-hero-copy > p:not(.release-invite) { max-width: 520px; margin: 0; }
+.release-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 25px; }
+.release-hero-download {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 275px;
+  min-height: 57px;
+  padding: 16px 20px;
+  font-size: 12px;
+  box-shadow: 0 13px 28px #4e478134;
+}
+.release-all-versions { font-size: 12px; color: #675cbe; font-weight: 800; padding: 12px; }
+.release-all-versions:hover, .release-invite a:hover { text-decoration: underline; }
+.release-invite { margin: 16px 0 0; color: #85869a; font-size: 12px; }
+.release-invite a { color: #6558c3; font-weight: 800; }
+.release-hero-foot { margin-top: 30px; }
+.download-bot-hero {
+  position: absolute;
+  z-index: 1;
+  width: min(44vw, 510px);
+  height: 465px;
+  right: -12px;
+  top: 25px;
+  pointer-events: none;
+}
+.download-bot-canvas { position: absolute; inset: 0; filter: drop-shadow(14px 22px 21px #6455a735); }
+.download-bot-fallback { display: grid; place-items: center; height: 100%; color: #675ac3; font-size: 60px; }
+.download-bot-bubble {
+  position: absolute;
+  right: 3%;
+  top: 13%;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e0dcf4;
+  border-radius: 15px 15px 4px 15px;
+  box-shadow: 0 15px 38px #443b7a19;
+  color: #6356bd;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transform: rotate(4deg);
+  transition: transform .25s, background .25s, color .25s;
+}
+.download-bot-bubble.is-cheering {
+  color: #fff;
+  background: #6558cf;
+  transform: rotate(-3deg) scale(1.06);
+}
+.release-list-section { scroll-margin-top: 20px; }
+@media (max-width: 1050px) {
+  .download-bot-hero { width: 42vw; right: -25px; opacity: .92; }
+  .release-hero-copy { max-width: 55%; }
+  .release-hero h1 { font-size: clamp(60px, 8vw, 90px); }
+}
+@media (max-width: 760px) {
+  .release-hero { display: block; min-height: 0; padding: 45px 0 34px; }
+  .release-hero-copy { max-width: none; }
+  .release-hero h1 { font-size: clamp(58px, 10vw, 76px); max-width: 100%; }
+  .release-hero-copy > p:not(.release-invite) { max-width: 440px; }
+  .release-hero-actions { margin-top: 22px; }
+  .release-hero-download { min-width: 0; width: min(100%, 320px); }
+  .release-hero-foot { margin-top: 22px; }
+  .download-bot-hero {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: min(100%, 340px);
+    height: 225px;
+    margin: 2px auto -12px;
+    opacity: 1;
+  }
+  .download-bot-bubble { top: 13%; right: -2%; font-size: 11px; }
+}
+@media (max-width: 450px) {
+  .release-hero h1 { font-size: 57px; }
+  .release-hero-actions { display: grid; gap: 5px; }
+  .release-all-versions { padding-left: 0; }
+  .download-bot-hero { height: 180px; margin-top: 4px; }
+}

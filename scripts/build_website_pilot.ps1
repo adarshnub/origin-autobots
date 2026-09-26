@@ -8,7 +8,6 @@ $env:VITE_COGNITO_HOSTED_UI_URL = & $terraform "-chdir=$dev" output -raw cognito
 if ($LASTEXITCODE -ne 0) { throw "Could not read Cognito domain." }
 $env:VITE_COGNITO_CLIENT_ID = & $terraform "-chdir=$dev" output -raw cognito_app_client_id
 if ($LASTEXITCODE -ne 0) { throw "Could not read Cognito app client." }
-$env:VITE_WINDOWS_DOWNLOAD_URL = "https://autobots.origin-studio.in/downloads/Autobots-Windows-Pilot.zip"
 Push-Location (Join-Path $repoRoot "apps\website")
 try {
     & npm.cmd run build
