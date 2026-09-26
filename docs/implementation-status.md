@@ -2,6 +2,15 @@
 
 Updated 26 September 2026.
 
+## 26 September 2026 — viewport-triggered demo playback
+
+- **Components:** The task walkthrough automatically starts once on first viewport entry with at least 15% visibility in an active tab. Offscreen playback remains suspended and resumes on return if still playing. Manual pause, STOP and chapter selection suppress automatic restarts; reduced-motion visitors retain manual playback.
+- **Commands and evidence:** `npm exec vite build` completed in 988 ms; `scripts/deploy_website_aws.ps1` uploaded the production artifacts successfully; `aws cloudfront wait invalidation-completed` completed for `IDSCGR9MJOI6ZY11XZ5B9AD6Y2` on `E21MANSPJEWFLG`. Published at `https://d39k5o9aaxn0fs.cloudfront.net/#in-action`.
+- **Tests executed:** None. Browser/app checks and type checking were skipped under the owner's existing instructions; viewport behavior is implemented but not runtime-tested.
+- **Cloud resources changed:** Updated objects in the existing website S3 origin and invalidated CloudFront. No infrastructure or desktop application changes.
+- **Metrics and limitations:** Main page JS 28.90 kB (7.66 kB gzip); existing shared 3D chunk still emits the build size warning. No runtime measurements were collected.
+- **Next task:** Owner review of the published autoplay behavior.
+
 ## 26 September 2026 — eyes branding, voice demo and curated resume portfolio
 
 - **Components:** Added one vector eyes mark with generated website favicon/touch assets and multi-resolution Windows ICO/PNG resources. Updated desktop branding in the executable/window/tray resources, active pilot and pointer caption, and added a shaded companion illustration to the empty activity view. WebGL robot chest panels now carry the eyes mark. Existing functional action icons retain their meanings.

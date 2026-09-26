@@ -24,6 +24,8 @@ The Calendar and WhatsApp windows are hand-built React/CSS illustrations. They a
 
 The updated hero and pilot examples are labeled interface previews. Earlier screenshots remain preserved in source assets but are no longer rendered by the active landing page. The page explicitly identifies the new workflow as an interactive simulation.
 
+The walkthrough automatically starts on its first entry into view, once at least 15% of its container is visible and the browser tab is active. Its existing timer suspends offscreen and continues on re-entry when playback is still enabled. Manual pause, STOP and chapter selection prevent a later automatic restart. A hidden tab does not begin playback; visitors who prefer reduced motion keep manual playback controls.
+
 ## Scope
 
 Production builds generate website files and a private unsigned Windows bundle. No browser or app tests, live desktop task, microphone capture, external message, account access, public Windows release, dependency installation or model request is part of this work. Website publication updates only the existing S3/CloudFront site.

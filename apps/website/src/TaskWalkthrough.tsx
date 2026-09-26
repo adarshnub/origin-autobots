@@ -62,14 +62,28 @@ export function TaskWalkthrough() {
   const [stopped, setStopped] = useState(false);
   const [inView, setInView] = useState(false);
   const host = useRef<HTMLDivElement>(null);
+  const autoplayHandled = useRef(false);
   const current = steps[step];
   const progress = Math.min(1, elapsed / current.duration);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(entries => setInView(entries[0].isIntersecting), { threshold: .15 });
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0];
+      setInView(entry.isIntersecting && entry.intersectionRatio >= .15);
+    }, { threshold: .15 });
     if (host.current) observer.observe(host.current);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    const startOnEntry = () => {
+      if (!inView || document.hidden || autoplayHandled.current) return;
+      autoplayHandled.current = true;
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setPlaying(true);
+    };
+    startOnEntry();
+    document.addEventListener("visibilitychange", startOnEntry);
+    return () => document.removeEventListener("visibilitychange", startOnEntry);
+  }, [inView]);
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("autobots:demo", { detail: inView }));
     return () => { window.dispatchEvent(new CustomEvent("autobots:demo", { detail: false })); };
@@ -87,13 +101,14 @@ export function TaskWalkthrough() {
     setStep(value => value + 1); setElapsed(0);
   }, [elapsed, playing, step, current.duration]);
 
-  const select = (index: number) => { setStep(index); setElapsed(steps[index].duration * .96); setPlaying(false); setStopped(false); };
+  const select = (index: number) => { autoplayHandled.current = true; setStep(index); setElapsed(steps[index].duration * .96); setPlaying(false); setStopped(false); };
   const play = () => {
+    autoplayHandled.current = true;
     if (step === steps.length - 1 || stopped) { setStep(0); setElapsed(0); }
     else if (!playing && elapsed >= current.duration * .95) setElapsed(0);
     setStopped(false); setPlaying(value => !value);
   };
-  const stop = () => { setPlaying(false); setStopped(true); };
+  const stop = () => { autoplayHandled.current = true; setPlaying(false); setStopped(true); };
   const coordinates = step === 0 ? [77,58] : step === 1 ? [48,15] : step === 2 ? (progress < .4 ? [59,36] : progress < .76 ? [65,53] : [78,72]) : step === 3 ? [78,72] : step === 4 ? [23,22] : progress < .72 ? [62,77] : [92,78];
 
   return <div className="task-demo" ref={host}>
